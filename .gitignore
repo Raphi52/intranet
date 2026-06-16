@@ -1,0 +1,12 @@
+node_modules/
+
+# Base de données SQLite (générée localement, ne pas versionner)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Logs & divers
+*.log
+.DS_Store
+.env

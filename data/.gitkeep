@@ -1,0 +1,2 @@
+# Ce dossier accueille la base SQLite `onboarding.db` (générée au 1er lancement).
+# Le fichier .db lui-même n'est pas versionné (voir .gitignore).

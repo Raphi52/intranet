@@ -1,0 +1,829 @@
+/* =========================================================================
+   Onboarding Amitel — feuille de style
+   Charte : rouge "amitel" + gris ardoise, fond clair, touches ludiques.
+   ========================================================================= */
+
+:root {
+  /* Couleurs de marque Amitel */
+  --rouge: #c0392b;
+  --rouge-hover: #a93226;
+  --gris: #363b45; /* le "mitel" du logo */
+  --gris-2: #5b626f;
+  --gris-3: #8a92a0;
+
+  /* Surfaces */
+  --fond: #f4f6f9;
+  --carte: #ffffff;
+  --bordure: #e6e9ef;
+  --bordure-forte: #d6dbe4;
+
+  /* États */
+  --vert: #27ae60;
+  --vert-clair: #eafaf1;
+  --ambre: #f39c12;
+
+  /* Divers */
+  --ombre: 0 1px 2px rgba(20, 24, 33, 0.04), 0 6px 20px rgba(20, 24, 33, 0.06);
+  --ombre-forte: 0 10px 40px rgba(20, 24, 33, 0.14);
+  --rayon: 16px;
+  --rayon-sm: 10px;
+  --transition: 0.18s ease;
+  --largeur-max: 1080px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--gris);
+  background: var(--fond);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3,
+.logo,
+.bouton {
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ----------------------------- En-tête ---------------------------------- */
+.entete {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--bordure);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--gris);
+  letter-spacing: -0.5px;
+}
+
+.logo__mark {
+  margin-right: 4px;
+  filter: drop-shadow(0 4px 8px rgba(192, 57, 43, 0.25));
+}
+
+.logo__sep {
+  width: 1px;
+  height: 22px;
+  background: var(--bordure-forte);
+  margin: 0 12px;
+}
+
+.logo__app {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rouge);
+  font-family: 'Inter', sans-serif;
+}
+
+.entete__actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ----------------------------- Contenu ---------------------------------- */
+.contenu {
+  max-width: var(--largeur-max);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 40px) 80px;
+}
+
+.chargement {
+  text-align: center;
+  color: var(--gris-3);
+  padding: 80px 0;
+}
+
+/* ----------------------------- Boutons ---------------------------------- */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition),
+    background var(--transition);
+  background: var(--rouge);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(192, 57, 43, 0.28);
+}
+.bouton:hover {
+  background: var(--rouge-hover);
+  transform: translateY(-1px);
+}
+.bouton:active {
+  transform: translateY(0);
+}
+
+.bouton--fantome {
+  background: transparent;
+  color: var(--gris-2);
+  box-shadow: none;
+  border: 1px solid var(--bordure-forte);
+}
+.bouton--fantome:hover {
+  background: #fff;
+  color: var(--gris);
+  border-color: var(--gris-3);
+}
+
+.bouton--danger {
+  background: transparent;
+  color: var(--rouge);
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+.bouton--danger:hover {
+  background: #fdecea;
+}
+
+.bouton--sm {
+  padding: 7px 14px;
+  font-size: 0.82rem;
+}
+
+/* ----------------------- Tableau de bord (cartes) ----------------------- */
+.tdb__entete {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.tdb__titre {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+.tdb__titre span {
+  color: var(--rouge);
+}
+.tdb__sous {
+  margin: 6px 0 0;
+  color: var(--gris-2);
+}
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.carte-collab {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 20px;
+  box-shadow: var(--ombre);
+  transition: transform var(--transition), box-shadow var(--transition),
+    border-color var(--transition);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.carte-collab:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ombre-forte);
+  border-color: var(--bordure-forte);
+}
+.carte-collab.is-complete {
+  border-color: var(--vert);
+  background: linear-gradient(180deg, var(--vert-clair), #fff 60%);
+}
+
+.carte-collab__haut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.avatar {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  color: #fff;
+  font-size: 1.05rem;
+  background: var(--gris);
+}
+.carte-collab__nom {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.carte-collab__poste {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--gris-2);
+}
+
+.puce {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: var(--gris-2);
+}
+.puce--badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.puce--ok {
+  background: var(--vert-clair);
+  color: var(--vert);
+}
+
+.carte-collab__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+/* Barre de progression linéaire */
+.barre {
+  height: 9px;
+  border-radius: 999px;
+  background: #edf0f5;
+  overflow: hidden;
+}
+.barre__remplissage {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rouge), #e0584b);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.barre__remplissage.is-complete {
+  background: linear-gradient(90deg, var(--vert), #2ecc71);
+}
+.barre-legende {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--gris-2);
+}
+.barre-legende strong {
+  color: var(--gris);
+}
+
+/* État vide */
+.vide {
+  text-align: center;
+  padding: 70px 20px;
+  background: var(--carte);
+  border: 2px dashed var(--bordure-forte);
+  border-radius: var(--rayon);
+}
+.vide__emoji {
+  font-size: 3rem;
+}
+.vide h3 {
+  margin: 12px 0 6px;
+}
+.vide p {
+  color: var(--gris-2);
+  margin: 0 0 20px;
+}
+
+/* ------------------------- Vue fiche / checklist ------------------------ */
+.fil {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--gris-2);
+  margin-bottom: 18px;
+}
+.fil a:hover {
+  color: var(--rouge);
+}
+
+.fiche-hero {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 24px;
+  box-shadow: var(--ombre);
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.fiche-hero__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  font-size: 1.4rem;
+}
+.fiche-hero__info {
+  flex: 1 1 220px;
+}
+.fiche-hero__info h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+.fiche-hero__info p {
+  margin: 4px 0 0;
+  color: var(--gris-2);
+}
+
+/* Anneau de progression (SVG) */
+.anneau {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  flex: 0 0 auto;
+}
+.anneau svg {
+  transform: rotate(-90deg);
+}
+.anneau__piste {
+  fill: none;
+  stroke: #edf0f5;
+  stroke-width: 9;
+}
+.anneau__valeur {
+  fill: none;
+  stroke: var(--rouge);
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.4s;
+}
+.anneau__valeur.is-complete {
+  stroke: var(--vert);
+}
+.anneau__txt {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Formulaire identité */
+.section {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.section__entete {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  cursor: pointer;
+  user-select: none;
+}
+.section__icone {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  background: #f1f3f8;
+}
+.section__titre {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.section__titre h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.section__titre small {
+  color: var(--gris-3);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.section__compteur {
+  font-size: 0.82rem;
+  color: var(--gris-2);
+  white-space: nowrap;
+}
+.section__mini-barre {
+  width: 90px;
+  height: 7px;
+}
+.section__chevron {
+  transition: transform var(--transition);
+  color: var(--gris-3);
+}
+.section.is-open .section__chevron {
+  transform: rotate(90deg);
+}
+.section__corps {
+  display: none;
+  padding: 0 22px 22px;
+  border-top: 1px solid var(--bordure);
+}
+.section.is-open .section__corps {
+  display: block;
+}
+.section.is-complete .section__icone {
+  background: var(--vert-clair);
+}
+
+/* Grille de champs */
+.champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  padding-top: 20px;
+}
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.champ label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gris-2);
+}
+.champ input,
+.champ select,
+.champ textarea {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--bordure-forte);
+  border-radius: var(--rayon-sm);
+  background: #fbfcfe;
+  color: var(--gris);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.champ input:focus,
+.champ select:focus,
+.champ textarea:focus {
+  outline: none;
+  border-color: var(--rouge);
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
+  background: #fff;
+}
+
+/* Demandes d'accès (pastilles cochables) */
+.demandes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  padding-top: 20px;
+}
+.demande {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--bordure-forte);
+  border-radius: var(--rayon-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  background: #fbfcfe;
+  font-size: 0.9rem;
+}
+.demande:hover {
+  border-color: var(--gris-3);
+}
+.demande.is-on {
+  border-color: var(--rouge);
+  background: #fdeceaee;
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+/* Liste des tâches */
+.taches {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+}
+.tache {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-sm);
+  background: #fbfcfe;
+  transition: background var(--transition), border-color var(--transition);
+}
+.tache.is-done {
+  background: var(--vert-clair);
+  border-color: #bfe9cf;
+}
+.tache.is-done .tache__libelle {
+  text-decoration: line-through;
+  color: var(--gris-2);
+}
+
+/* Case à cocher personnalisée */
+.coche {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 2px solid var(--bordure-forte);
+  border-radius: 7px;
+  cursor: pointer;
+  position: relative;
+  flex: 0 0 auto;
+  transition: all var(--transition);
+  background: #fff;
+}
+.coche:hover {
+  border-color: var(--vert);
+}
+.coche:checked {
+  background: var(--vert);
+  border-color: var(--vert);
+  animation: pop 0.28s ease;
+}
+.coche:checked::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 3px;
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.tache__corps {
+  min-width: 0;
+}
+.tache__libelle {
+  font-weight: 600;
+  margin: 0;
+}
+.tache__details {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--gris-2);
+}
+.tache__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: var(--gris-2);
+}
+.tag--resp {
+  background: #e9edf7;
+  color: #46506b;
+}
+.tag--profil {
+  background: #fdf0e6;
+  color: #b3641a;
+}
+.tache__comm {
+  margin-top: 10px;
+  width: 100%;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  border: 1px dashed var(--bordure-forte);
+  border-radius: 8px;
+  background: transparent;
+  resize: vertical;
+  min-height: 0;
+  color: var(--gris);
+}
+.tache__comm:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--rouge);
+  background: #fff;
+}
+
+/* Bannière de relais entre services */
+.relais {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px 18px;
+  border-radius: var(--rayon-sm);
+  background: repeating-linear-gradient(
+    45deg,
+    #fff6f5,
+    #fff6f5 12px,
+    #fdeeec 12px,
+    #fdeeec 24px
+  );
+  border: 1px solid #f6cfc9;
+  color: var(--rouge);
+  font-weight: 600;
+  font-size: 0.92rem;
+  opacity: 0.55;
+  transition: opacity var(--transition), transform var(--transition);
+}
+.relais.is-active {
+  opacity: 1;
+  transform: scale(1.01);
+  box-shadow: 0 6px 18px rgba(192, 57, 43, 0.12);
+}
+.relais__icone {
+  font-size: 1.2rem;
+}
+
+/* --------------------------- Modale ------------------------------------- */
+.modale-fond {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 33, 0.45);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 50;
+  animation: fade 0.2s ease;
+}
+.modale {
+  background: #fff;
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-forte);
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  animation: monte 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modale__entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--bordure);
+}
+.modale__entete h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.modale__fermer {
+  border: none;
+  background: #f1f3f8;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--gris-2);
+}
+.modale__fermer:hover {
+  background: #e6e9ef;
+}
+.modale__corps {
+  padding: 22px 24px;
+}
+.modale__pied {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--bordure);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes monte {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* --------------------------- Toasts ------------------------------------- */
+.toasts {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 60;
+  pointer-events: none;
+}
+.toast {
+  background: var(--gris);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  box-shadow: var(--ombre-forte);
+  animation: monte 0.25s ease;
+}
+.toast--ok {
+  background: var(--vert);
+}
+.toast--err {
+  background: var(--rouge);
+}
+
+/* --------------------------- Confettis ---------------------------------- */
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* --------------------------- Responsive --------------------------------- */
+@media (max-width: 560px) {
+  .fiche-hero {
+    text-align: center;
+    justify-content: center;
+  }
+  .section__mini-barre {
+    display: none;
+  }
+}
+
+/* --------------------------- Impression --------------------------------- */
+@media print {
+  .entete__actions,
+  .confetti,
+  .toasts,
+  .section__chevron,
+  .bouton {
+    display: none !important;
+  }
+  .section__corps {
+    display: block !important;
+  }
+  body {
+    background: #fff;
+  }
+}
