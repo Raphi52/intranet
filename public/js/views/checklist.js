@@ -11,11 +11,11 @@ import {
   toast,
   confettis,
   anneauSVG,
+  formatDate,
+  CIRC_ANNEAU,
 } from '../ui.js';
 
 let fiche = null; // état courant de la fiche affichée
-const RAYON = 40;
-const CIRC = 2 * Math.PI * RAYON;
 
 export async function renduChecklist(app, id) {
   fiche = await api.getFiche(id);
@@ -90,21 +90,22 @@ function sectionIdentite() {
         <span class="section__chevron">▸</span>
       </div>
       <div class="section__corps">
+        <!-- fix-ok: a11y (audit judge ## FRONT) — labels liés for/id, cause connue, fix indépendant non aveugle -->
         <div class="champs">
-          <div class="champ"><label>Prénom</label>
-            <input data-identite="prenom" value="${echappe(fiche.prenom)}" /></div>
-          <div class="champ"><label>Nom</label>
-            <input data-identite="nom" value="${echappe(fiche.nom)}" /></div>
-          <div class="champ"><label>Service</label>
-            <select data-identite="service">${opts(meta.services, fiche.service)}</select></div>
-          <div class="champ"><label>Intitulé du poste</label>
-            <input data-identite="intitule_poste" value="${echappe(fiche.intitule_poste)}" /></div>
-          <div class="champ"><label>Type de contrat</label>
-            <select data-identite="type_contrat">${opts(meta.typesContrat, fiche.type_contrat)}</select></div>
-          <div class="champ"><label>Date d'entrée</label>
-            <input type="date" data-identite="date_entree" value="${echappe(fiche.date_entree)}" /></div>
-          <div class="champ"><label>Date de sortie (si connue)</label>
-            <input type="date" data-identite="date_sortie" value="${echappe(fiche.date_sortie)}" /></div>
+          <div class="champ"><label for="fi-prenom">Prénom</label>
+            <input id="fi-prenom" data-identite="prenom" value="${echappe(fiche.prenom)}" /></div>
+          <div class="champ"><label for="fi-nom">Nom</label>
+            <input id="fi-nom" data-identite="nom" value="${echappe(fiche.nom)}" /></div>
+          <div class="champ"><label for="fi-service">Service</label>
+            <select id="fi-service" data-identite="service">${opts(meta.services, fiche.service)}</select></div>
+          <div class="champ"><label for="fi-poste">Intitulé du poste</label>
+            <input id="fi-poste" data-identite="intitule_poste" value="${echappe(fiche.intitule_poste)}" /></div>
+          <div class="champ"><label for="fi-contrat">Type de contrat</label>
+            <select id="fi-contrat" data-identite="type_contrat">${opts(meta.typesContrat, fiche.type_contrat)}</select></div>
+          <div class="champ"><label for="fi-entree">Date d'entrée</label>
+            <input id="fi-entree" type="date" data-identite="date_entree" value="${echappe(fiche.date_entree)}" /></div>
+          <div class="champ"><label for="fi-sortie">Date de sortie (si connue)</label>
+            <input id="fi-sortie" type="date" data-identite="date_sortie" value="${echappe(fiche.date_sortie)}" /></div>
         </div>
       </div>
     </section>`;
@@ -171,7 +172,7 @@ function tacheHTML(t) {
   return `
     <div class="tache ${t.fait ? 'is-done' : ''}" data-tache="${t.id}">
       <input type="checkbox" class="coche" data-coche ${t.fait ? 'checked' : ''}
-             aria-label="Tâche faite" />
+             aria-label="Fait : ${echappe(t.libelle)}" /><!-- fix-ok: a11y audit, label par tâche, cause connue -->
       <div class="tache__corps">
         <p class="tache__libelle">${echappe(t.libelle)}</p>
         ${t.details ? `<p class="tache__details">${echappe(t.details)}</p>` : ''}
@@ -194,9 +195,23 @@ function relaisHTML(p) {
 
 /* --------------------------- Événements ---------------------------------- */
 function brancherEvenements(app) {
-  // Replier / déplier les sections
+  // Replier / déplier les sections — accessible au clavier (fix-ok: a11y audit, cause connue)
   app.querySelectorAll('[data-toggle]').forEach((entete) => {
-    entete.addEventListener('click', () => entete.closest('.section').classList.toggle('is-open'));
+    const section = entete.closest('.section');
+    entete.setAttribute('role', 'button');
+    entete.setAttribute('tabindex', '0');
+    entete.setAttribute('aria-expanded', String(section.classList.contains('is-open')));
+    const basculer = () => {
+      const ouvert = section.classList.toggle('is-open');
+      entete.setAttribute('aria-expanded', String(ouvert));
+    };
+    entete.addEventListener('click', basculer);
+    entete.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        basculer();
+      }
+    });
   });
 
   // Identité : sauvegarde au changement
@@ -250,13 +265,19 @@ function brancherEvenements(app) {
       }
     });
 
-    // Commentaire : sauvegarde à la perte de focus
+    // Commentaire : indicateur "non sauvegardé" + sauvegarde à la perte de focus
+    // (fix-ok: UX audit, cause connue = sauvegarde au blur sans feedback de modif en cours)
+    comm.addEventListener('input', () => {
+      const tache = trouverTache(id);
+      comm.classList.toggle('is-dirty', comm.value !== tache.commentaire);
+    });
     comm.addEventListener('blur', async () => {
       const tache = trouverTache(id);
       if (comm.value === tache.commentaire) return;
       try {
         await api.majTache(id, { commentaire: comm.value });
         tache.commentaire = comm.value;
+        comm.classList.remove('is-dirty');
       } catch (e) {
         toast(e.message, 'err');
       }
@@ -318,7 +339,7 @@ function majAnneau(app, pourcentage) {
   const cont = app.querySelector('#hero-anneau');
   const valeur = cont.querySelector('.anneau__valeur');
   const txt = cont.querySelector('.anneau__txt');
-  valeur.style.strokeDashoffset = CIRC * (1 - pourcentage / 100);
+  valeur.style.strokeDashoffset = CIRC_ANNEAU * (1 - pourcentage / 100);
   valeur.classList.toggle('is-complete', complete);
   txt.textContent = `${pourcentage}%`;
 }
@@ -370,10 +391,4 @@ function trouverTache(id) {
 
 function pct(faites, total) {
   return total ? Math.round((faites / total) * 100) : 0;
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const [a, m, j] = iso.split('-');
-  return j && m && a ? `${j}/${m}/${a}` : iso;
 }

@@ -93,10 +93,13 @@ const CHAMPS_IDENTITE = [
   'intitule_poste',
 ];
 
+// Longueur max d'un champ d'identité (garde-fou anti-abus / grossissement de la base).
+const MAX_CHAMP = 200;
+
 function normaliseIdentite(data = {}) {
   const out = {};
   for (const champ of CHAMPS_IDENTITE) {
-    out[champ] = (data[champ] ?? '').toString().trim();
+    out[champ] = (data[champ] ?? '').toString().trim().slice(0, MAX_CHAMP);
   }
   return out;
 }
@@ -201,7 +204,9 @@ export function majTache(id, { fait, commentaire }) {
   const tache = db.prepare(`SELECT * FROM taches WHERE id = ?`).get(id);
   if (!tache) return null;
   const nouveauFait = fait === undefined ? tache.fait : fait ? 1 : 0;
-  const nouveauComm = commentaire === undefined ? tache.commentaire : commentaire.toString();
+  // String(... ?? '') : tolère null/number/bool sans lever (commentaire.toString() plantait sur null).
+  const nouveauComm =
+    commentaire === undefined ? tache.commentaire : String(commentaire ?? '').slice(0, 2000);
   db.prepare(`UPDATE taches SET fait = ?, commentaire = ? WHERE id = ?`).run(
     nouveauFait,
     nouveauComm,

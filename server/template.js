@@ -202,14 +202,15 @@ export const TACHES = {
       libelle: 'Licence VS (DEV)',
       details: 'Attribution licence VS + CoPilote (trial 30j DEV).',
       responsable: 'Exploitation',
-      type_profil: 'DEV',
+      // type_profil laissé vide : colonne « Type profil » vierge dans l'Excel pour cette ligne.
     },
     {
       libelle: 'Config. Rapport d’Activité (RA)',
       details:
         'Créer le compte sur ra.intranet.com. Associer le modèle d’heures et le service. Identifiants : calqués sur l’AD.',
-      responsable: 'Exploitation',
-      type_profil: 'Tous',
+      // L'Excel place cette tâche sous la section Exploitation mais en attribue la
+      // responsabilité au Judiciaire (et laisse la colonne « Type profil » vierge).
+      responsable: 'Judiciaire',
     },
   ],
 

@@ -812,18 +812,61 @@ a {
 }
 
 /* --------------------------- Impression --------------------------------- */
+/* fix-ok: audit front (UX/a11y) — impression PDF propre, focus visible, état non-sauvegardé, reduced-motion */
 @media print {
+  .entete,
   .entete__actions,
   .confetti,
   .toasts,
   .section__chevron,
+  .fil,
   .bouton {
     display: none !important;
   }
   .section__corps {
     display: block !important;
   }
+  .contenu {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+  }
+  .section,
+  .tache,
+  .carte-collab {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
   body {
     background: #fff;
+  }
+}
+
+/* Focus clavier visible (WCAG 2.4.7) sur les contrôles sans remplacement d'outline. */
+.bouton:focus-visible,
+.carte-collab:focus-visible,
+.demande:focus-visible,
+.section__entete:focus-visible,
+.modale__fermer:focus-visible {
+  outline: 2px solid var(--rouge);
+  outline-offset: 2px;
+}
+
+/* Commentaire de tâche modifié mais pas encore enregistré. */
+.tache__comm.is-dirty {
+  border-color: #d68910;
+  box-shadow: 0 0 0 3px rgba(214, 137, 16, 0.15);
+}
+
+/* Respect de la préférence système « réduire les animations ». */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

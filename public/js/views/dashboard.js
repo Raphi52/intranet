@@ -9,6 +9,7 @@ import {
   nomComplet,
   couleurAvatar,
   toast,
+  formatDate,
 } from '../ui.js';
 
 export async function renduDashboard(app) {
@@ -42,8 +43,16 @@ export async function renduDashboard(app) {
   app.querySelector('#btn-nouveau-vide')?.addEventListener('click', () => formulaireCreation());
 
   app.querySelectorAll('[data-collab]').forEach((carte) => {
-    carte.addEventListener('click', () => {
+    const ouvrir = () => {
       location.hash = `#/c/${carte.dataset.collab}`;
+    };
+    carte.addEventListener('click', ouvrir);
+    // Accessibilité clavier : la carte est focusable (tabindex=0), Entrée/Espace l'activent.
+    carte.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        ouvrir();
+      }
     });
   });
 }
@@ -145,10 +154,4 @@ function formulaireCreation() {
       });
     },
   });
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const [a, m, j] = iso.split('-');
-  return j && m && a ? `${j}/${m}/${a}` : iso;
 }

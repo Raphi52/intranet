@@ -1,5 +1,16 @@
 /** Helpers d'interface : échappement HTML, toasts, initiales, confettis. */
 
+// Géométrie de l'anneau de progression — source unique (utilisée par anneauSVG ET checklist.js).
+export const RAYON_ANNEAU = 40;
+export const CIRC_ANNEAU = 2 * Math.PI * RAYON_ANNEAU;
+
+/** Formate une date ISO (AAAA-MM-JJ) en JJ/MM/AAAA. Source unique (dashboard + checklist). */
+export function formatDate(iso) {
+  if (!iso) return '';
+  const [a, m, j] = iso.split('-');
+  return j && m && a ? `${j}/${m}/${a}` : iso;
+}
+
 export function echappe(valeur) {
   if (valeur === null || valeur === undefined) return '';
   return String(valeur)
@@ -97,8 +108,8 @@ export function confettis(duree = 2600) {
 
 // --- Anneau de progression (SVG) ------------------------------------------
 export function anneauSVG(pourcentage, complete = false) {
-  const r = 40;
-  const c = 2 * Math.PI * r;
+  const r = RAYON_ANNEAU;
+  const c = CIRC_ANNEAU;
   const offset = c * (1 - pourcentage / 100);
   return `
     <div class="anneau">
