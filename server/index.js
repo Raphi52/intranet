@@ -1,27 +1,21 @@
 /**
- * Serveur Express : sert l'application web (dossier /public) et expose l'API REST
- * de gestion des fiches d'onboarding (stockées en SQLite).
+ * Portail Amitel — serveur (shell).
+ *
+ * Ne connaît AUCUNE section en propre : il met en place le socle commun
+ * (sécurité, JSON, statiques, SPA) puis monte dynamiquement toutes les
+ * sections déclarées dans `server/sections/index.js`.
  */
 
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import {
-  creerCollaborateur,
-  getFiche,
-  listerCollaborateurs,
-  majIdentite,
-  majTache,
-  majDemande,
-  supprimerCollaborateur,
-} from './db.js';
-import { PARTIES, SERVICES, TYPES_CONTRAT } from './template.js';
+import { enregistrerSections } from './sections/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 // Interface d'écoute. Par défaut toutes interfaces (usage LAN interne) ; mettre
-// HOST=127.0.0.1 pour restreindre à la machine locale. Voir aussi la note d'auth du README.
+// HOST=127.0.0.1 pour restreindre à la machine locale.
 const HOST = process.env.HOST || undefined;
 
 const app = express();
@@ -38,83 +32,18 @@ app.use((_req, res, next) => {
 // Le payload légitime est minuscule : on plafonne bas pour limiter l'abus.
 app.use(express.json({ limit: '32kb' }));
 
-// Petit utilitaire pour renvoyer une 404 propre.
-const introuvable = (res) => res.status(404).json({ erreur: 'Collaborateur introuvable' });
-
-// Parse + valide un :id de route. Renvoie null (et répond 400) si non entier positif.
-const idValide = (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    res.status(400).json({ erreur: 'Identifiant invalide' });
-    return null;
-  }
-  return id;
-};
-
-// --- Métadonnées (services, contrats, structure des parties) --------------
-app.get('/api/meta', (_req, res) => {
-  res.json({
-    services: SERVICES,
-    typesContrat: TYPES_CONTRAT,
-    parties: PARTIES.map(({ cle, titre, icone, sousTitre, relais }) => ({
-      cle,
-      titre,
-      icone,
-      sousTitre,
-      relais,
-    })),
-  });
+// --- Point d'ancrage AUTH (inactif) ---------------------------------------
+// L'auth n'est pas encore branchée (réseau interne de confiance). Quand une
+// section sensible l'exigera, brancher ici un middleware qui peuple req.user,
+// puis protéger les sections concernées dans leur register(). Laisser passer
+// pour l'instant.
+app.use((req, _res, next) => {
+  req.user = null; // aucun utilisateur authentifié pour le moment
+  next();
 });
 
-// --- Collaborateurs --------------------------------------------------------
-app.get('/api/collaborateurs', (_req, res) => {
-  res.json(listerCollaborateurs());
-});
-
-app.post('/api/collaborateurs', (req, res) => {
-  const { nom, prenom } = req.body || {};
-  if (!nom?.trim() && !prenom?.trim()) {
-    return res.status(400).json({ erreur: 'Le nom ou le prénom est requis.' });
-  }
-  const id = creerCollaborateur(req.body || {});
-  res.status(201).json(getFiche(id));
-});
-
-app.get('/api/collaborateurs/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const fiche = getFiche(id);
-  return fiche ? res.json(fiche) : introuvable(res);
-});
-
-app.put('/api/collaborateurs/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const fiche = majIdentite(id, req.body || {});
-  return fiche ? res.json(fiche) : introuvable(res);
-});
-
-app.delete('/api/collaborateurs/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const ok = supprimerCollaborateur(id);
-  return ok ? res.status(204).end() : introuvable(res);
-});
-
-// --- Tâches & demandes -----------------------------------------------------
-app.patch('/api/taches/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const t = majTache(id, req.body || {});
-  return t ? res.json(t) : res.status(404).json({ erreur: 'Tâche introuvable' });
-});
-
-app.patch('/api/demandes/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const d = majDemande(id, req.body || {});
-  return d ? res.json(d) : res.status(404).json({ erreur: 'Demande introuvable' });
-});
+// --- Sections du portail (montées dynamiquement) --------------------------
+enregistrerSections(app);
 
 // --- Fichiers statiques (SPA) ---------------------------------------------
 app.use(express.static(join(__dirname, '..', 'public')));
@@ -136,5 +65,5 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`\n  ✅ Onboarding Amitel démarré sur http://localhost:${PORT}\n`);
+  console.log(`\n  ✅ Portail Amitel démarré sur http://localhost:${PORT}\n`);
 });

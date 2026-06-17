@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Onboarding Amitel · Checklist nouveau collaborateur</title>
+    <title>Portail Amitel</title>
     <meta
       name="description"
-      content="Application d'accueil des nouveaux collaborateurs Amitel : checklist interactive et ludique."
+      content="Portail interne Amitel : onboarding des nouveaux collaborateurs, docs internes et plus à venir."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,7 +19,7 @@
   </head>
   <body>
     <header class="entete">
-      <a class="logo" href="#/" aria-label="Accueil Onboarding Amitel">
+      <a class="logo" href="#/" aria-label="Accueil Portail Amitel">
         <svg class="logo__mark" viewBox="0 0 44 44" width="40" height="40" aria-hidden="true">
           <rect x="1" y="1" width="42" height="42" rx="11" fill="var(--rouge)" />
           <text
@@ -36,8 +36,12 @@
         </svg>
         <span class="logo__texte">mitel</span>
         <span class="logo__sep" aria-hidden="true"></span>
-        <span class="logo__app">Onboarding</span>
+        <span class="logo__app">Portail</span>
       </a>
+
+      <!-- Navigation entre sections — peuplée dynamiquement depuis le registre front. -->
+      <nav id="portail-nav" class="nav" aria-label="Sections du portail"></nav>
+
       <div class="entete__actions" id="entete-actions"></div>
     </header>
 
@@ -51,6 +55,6 @@
     <!-- Canvas pour les confettis de célébration -->
     <canvas id="confetti" class="confetti"></canvas>
 
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/core/app.js"></script>
   </body>
 </html>

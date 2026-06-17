@@ -1,8 +1,8 @@
 /** Vue "Fiche / Checklist" d'un collaborateur : identité, demandes, tâches. */
 
-import { api } from '../api.js';
-import { store } from '../store.js';
-import { ouvrirModale, fermerModale } from '../modal.js';
+import { api } from './api.js';
+import { store } from './store.js';
+import { ouvrirModale, fermerModale } from '../../core/modal.js';
 import {
   echappe,
   initiales,
@@ -13,20 +13,20 @@ import {
   anneauSVG,
   formatDate,
   CIRC_ANNEAU,
-} from '../ui.js';
+} from '../../core/ui.js';
 
 let fiche = null; // état courant de la fiche affichée
 
 export async function renduChecklist(app, id) {
   fiche = await api.getFiche(id);
   if (!fiche) {
-    app.innerHTML = `<p class="vide">Fiche introuvable. <a href="#/">Retour</a></p>`;
+    app.innerHTML = `<p class="vide">Fiche introuvable. <a href="#/onboarding/">Retour</a></p>`;
     return;
   }
 
   app.innerHTML = `
     <div class="fil">
-      <a href="#/">← Tableau de bord</a>
+      <a href="#/onboarding/">← Tableau de bord</a>
     </div>
     ${heroHTML()}
     ${sectionIdentite()}
@@ -371,7 +371,7 @@ function confirmerSuppression() {
           await api.supprimerCollaborateur(fiche.id);
           fermerModale();
           toast('Fiche supprimée.', 'ok');
-          location.hash = '#/';
+          location.hash = '#/onboarding/';
         } catch (e) {
           toast(e.message, 'err');
         }

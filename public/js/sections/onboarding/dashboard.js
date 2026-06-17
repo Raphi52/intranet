@@ -1,8 +1,8 @@
 /** Vue "Tableau de bord" : liste des collaborateurs + création d'une fiche. */
 
-import { api } from '../api.js';
-import { store } from '../store.js';
-import { ouvrirModale, fermerModale } from '../modal.js';
+import { api } from './api.js';
+import { store } from './store.js';
+import { ouvrirModale, fermerModale } from '../../core/modal.js';
 import {
   echappe,
   initiales,
@@ -10,7 +10,7 @@ import {
   couleurAvatar,
   toast,
   formatDate,
-} from '../ui.js';
+} from '../../core/ui.js';
 
 export async function renduDashboard(app) {
   const collabs = await api.listerCollaborateurs();
@@ -44,7 +44,7 @@ export async function renduDashboard(app) {
 
   app.querySelectorAll('[data-collab]').forEach((carte) => {
     const ouvrir = () => {
-      location.hash = `#/c/${carte.dataset.collab}`;
+      location.hash = `#/onboarding/c/${carte.dataset.collab}`;
     };
     carte.addEventListener('click', ouvrir);
     // Accessibilité clavier : la carte est focusable (tabindex=0), Entrée/Espace l'activent.
@@ -142,7 +142,7 @@ function formulaireCreation() {
           const fiche = await api.creerCollaborateur(data);
           fermerModale();
           toast('Fiche créée 🎉', 'ok');
-          location.hash = `#/c/${fiche.id}`;
+          location.hash = `#/onboarding/c/${fiche.id}`;
         } catch (e) {
           toast(e.message, 'err');
         }

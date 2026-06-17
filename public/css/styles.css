@@ -1,5 +1,5 @@
 /* =========================================================================
-   Onboarding Amitel — feuille de style
+   Portail Amitel — design-system partagé
    Charte : rouge "amitel" + gris ardoise, fond clair, touches ludiques.
    ========================================================================= */
 
@@ -868,5 +868,91 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===================== Portail : navigation entre sections ================ */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto; /* pousse les actions à droite */
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+.nav__lien {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gris-2);
+  transition: background var(--transition), color var(--transition);
+}
+.nav__lien:hover {
+  background: var(--fond);
+  color: var(--gris);
+}
+.nav__lien.is-active {
+  background: var(--rouge);
+  color: #fff;
+}
+.nav__icone {
+  font-size: 1rem;
+  line-height: 1;
+}
+.nav__lien:focus-visible {
+  outline: 2px solid var(--rouge);
+  outline-offset: 2px;
+}
+
+/* ===================== Portail : accueil (cartes de sections) ============= */
+.grille-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+.carte-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 22px;
+  box-shadow: var(--ombre);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.carte-section:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ombre-forte);
+  border-color: var(--bordure-forte);
+}
+.carte-section:focus-visible {
+  outline: 2px solid var(--rouge);
+  outline-offset: 2px;
+}
+.carte-section__icone {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.carte-section__titre {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  color: var(--gris);
+}
+.carte-section__desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--gris-3);
+}
+
+/* La nav portail disparaît à l'impression (déjà couverte par .entete, rappel explicite). */
+@media print {
+  .nav {
+    display: none !important;
   }
 }

@@ -1,26 +1,15 @@
 /**
- * Couche d'accès à la base SQLite (better-sqlite3).
+ * Section ONBOARDING — couche d'accès aux données.
  *
- * - Crée le schéma au démarrage s'il n'existe pas.
- * - Expose des fonctions de haut niveau utilisées par les routes Express.
+ * Possède SES tables (collaborateurs / demandes / taches) sur la connexion
+ * partagée du portail (`core/db.js`). Le schéma et les requêtes vivent ici,
+ * isolés des autres sections.
  */
 
-import Database from 'better-sqlite3';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { mkdirSync } from 'node:fs';
-
+import db from '../../core/db.js';
 import { DEMANDES, TACHES, PARTIES } from './template.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, '..', 'data');
-mkdirSync(DATA_DIR, { recursive: true });
-
-const db = new Database(join(DATA_DIR, 'onboarding.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-// --- Schéma ---------------------------------------------------------------
+// --- Schéma (idempotent) --------------------------------------------------
 db.exec(`
   CREATE TABLE IF NOT EXISTS collaborateurs (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +68,10 @@ const stmts = {
   getTaches: db.prepare(`SELECT * FROM taches WHERE collaborateur_id = ? ORDER BY ordre`),
   deleteCollab: db.prepare(`DELETE FROM collaborateurs WHERE id = ?`),
   touchCollab: db.prepare(`UPDATE collaborateurs SET updated_at = datetime('now') WHERE id = ?`),
+  compteTaches: db.prepare(`
+    SELECT COUNT(*) AS total, COALESCE(SUM(fait), 0) AS faites
+    FROM taches WHERE collaborateur_id = ?
+  `),
 };
 
 // --- Helpers ---------------------------------------------------------------
@@ -167,14 +160,8 @@ export function getFiche(id) {
 /** Liste des collaborateurs avec un résumé de progression (pour le tableau de bord). */
 export function listerCollaborateurs() {
   const collabs = stmts.listCollabs.all();
-  const compte = db.prepare(`
-    SELECT
-      COUNT(*) AS total,
-      COALESCE(SUM(fait), 0) AS faites
-    FROM taches WHERE collaborateur_id = ?
-  `);
   return collabs.map((c) => {
-    const { total, faites } = compte.get(c.id);
+    const { total, faites } = stmts.compteTaches.get(c.id);
     return {
       ...c,
       progression: {
@@ -228,5 +215,3 @@ export function majDemande(id, { demande }) {
 export function supprimerCollaborateur(id) {
   return stmts.deleteCollab.run(id).changes > 0;
 }
-
-export default db;
