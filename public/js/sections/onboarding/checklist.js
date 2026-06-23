@@ -12,10 +12,12 @@ import {
   confettis,
   anneauSVG,
   formatDate,
+  formatHorodatage,
   CIRC_ANNEAU,
 } from '../../core/ui.js';
 
 let fiche = null; // état courant de la fiche affichée
+const demandesEnVol = new Set(); // anti double-clic : ids de demandes dont la bascule est en cours
 
 export async function renduChecklist(app, id) {
   fiche = await api.getFiche(id);
@@ -23,7 +25,13 @@ export async function renduChecklist(app, id) {
     app.innerHTML = `<p class="vide">Fiche introuvable. <a href="#/onboarding/">Retour</a></p>`;
     return;
   }
+  rerendreCorps(app);
+}
 
+/** (Re)génère le HTML complet de la fiche à partir de l'état `fiche` courant et
+ *  rebranche les événements. Réutilisé après une bascule de demande (la section
+ *  « accès » a pu apparaître/disparaître) — sans re-fetch réseau. */
+function rerendreCorps(app) {
   app.innerHTML = `
     <div class="fil">
       <a href="#/onboarding/">← Tableau de bord</a>
@@ -107,8 +115,22 @@ function sectionIdentite() {
           <div class="champ"><label for="fi-sortie">Date de sortie (si connue)</label>
             <input id="fi-sortie" type="date" data-identite="date_sortie" value="${echappe(fiche.date_sortie)}" /></div>
         </div>
+        <p class="sig-identite" data-sig-identite>${sigIdentite()}</p>
       </div>
     </section>`;
+}
+
+/** Signature de la fiche : créateur + dernier modificateur de l'identité. */
+function sigIdentite() {
+  const bouts = [];
+  if (fiche.cree_par) bouts.push(`Créée par ${echappe(fiche.cree_par)}`);
+  if (fiche.identite_par)
+    bouts.push(
+      `identité modifiée par ${echappe(fiche.identite_par)}${
+        fiche.identite_le ? ` · ${formatHorodatage(fiche.identite_le)}` : ''
+      }`,
+    );
+  return bouts.join(' · ');
 }
 
 /* --------------------------- Section demandes ---------------------------- */
@@ -119,7 +141,8 @@ function sectionDemandes() {
       (d) => `
       <label class="demande ${d.demande ? 'is-on' : ''}" data-demande="${d.id}">
         <span class="demande__check">${d.demande ? '✓' : '○'}</span>
-        <span>${echappe(d.libelle)}</span>
+        <span class="demande__txt">${echappe(d.libelle)}</span>
+        <span class="signature demande__sig" data-sig-demande>${sigDemande(d)}</span>
       </label>`,
     )
     .join('');
@@ -136,6 +159,11 @@ function sectionDemandes() {
         <div class="demandes">${pastilles}</div>
       </div>
     </section>`;
+}
+
+/** Signature d'une demande active : qui l'a activée. */
+function sigDemande(d) {
+  return d.demande && d.demande_par ? `👤 ${echappe(d.demande_par)}` : '';
 }
 
 /* ---------------------------- Section partie ----------------------------- */
@@ -162,15 +190,22 @@ function sectionPartie(p) {
 }
 
 function tacheHTML(t) {
+  // Feature #2 — badge d'échéance (calculée serveur) ; rouge si en retard.
+  const echeanceTag = t.echeance
+    ? `<span class="tag ${t.en_retard ? 'tag--retard' : 'tag--echeance'}">📅 ${echappe(formatDate(t.echeance))}${
+        t.en_retard ? ' · en retard' : ''
+      }</span>`
+    : '';
   const tags = [
     t.responsable && `<span class="tag tag--resp">👤 ${echappe(t.responsable)}</span>`,
     t.type_profil && `<span class="tag tag--profil">${echappe(t.type_profil)}</span>`,
+    echeanceTag,
   ]
     .filter(Boolean)
     .join('');
 
   return `
-    <div class="tache ${t.fait ? 'is-done' : ''}" data-tache="${t.id}">
+    <div class="tache ${t.fait ? 'is-done' : ''} ${t.en_retard ? 'is-retard' : ''}" data-tache="${t.id}">
       <input type="checkbox" class="coche" data-coche ${t.fait ? 'checked' : ''}
              aria-label="Fait : ${echappe(t.libelle)}" /><!-- fix-ok: a11y audit, label par tâche, cause connue -->
       <div class="tache__corps">
@@ -179,8 +214,26 @@ function tacheHTML(t) {
         <div class="tache__tags">${tags}</div>
         <textarea class="tache__comm" data-comm rows="1"
           placeholder="Commentaire…">${echappe(t.commentaire)}</textarea>
+        <div class="tache__signatures" data-signatures>${signaturesTache(t)}</div>
       </div>
     </div>`;
+}
+
+/** Signatures d'une tâche : qui l'a cochée, qui l'a commentée (dernier intervenant). */
+function signaturesTache(t) {
+  const coche =
+    t.fait && t.fait_par
+      ? `<span class="signature signature--coche">✓ ${echappe(t.fait_par)}${
+          t.fait_le ? ` · ${formatHorodatage(t.fait_le)}` : ''
+        }</span>`
+      : '';
+  const comm =
+    t.commentaire && t.commentaire_par
+      ? `<span class="signature">💬 ${echappe(t.commentaire_par)}${
+          t.commentaire_le ? ` · ${formatHorodatage(t.commentaire_le)}` : ''
+        }</span>`
+      : '';
+  return coche + comm;
 }
 
 /* ----------------------------- Relais ------------------------------------ */
@@ -221,28 +274,21 @@ function brancherEvenements(app) {
       try {
         fiche = await api.majIdentite(fiche.id, { [champ]: el.value });
         majHero();
+        const sig = app.querySelector('[data-sig-identite]');
+        if (sig) sig.innerHTML = sigIdentite();
       } catch (e) {
         toast(e.message, 'err');
       }
     });
   });
 
-  // Demandes d'accès : bascule
+  // Demandes d'accès : bascule (génère/retire les tâches d'accès en cascade)
   app.querySelectorAll('[data-demande]').forEach((label) => {
     label.addEventListener('click', async (e) => {
       e.preventDefault();
       const id = Number(label.dataset.demande);
       const d = fiche.demandes.find((x) => x.id === id);
-      const nouvelle = !d.demande;
-      try {
-        await api.majDemande(id, { demande: nouvelle });
-        d.demande = nouvelle;
-        label.classList.toggle('is-on', nouvelle);
-        label.querySelector('.demande__check').textContent = nouvelle ? '✓' : '○';
-        majCompteurDemandes(app);
-      } catch (err) {
-        toast(err.message, 'err');
-      }
+      basculerDemande(app, id, !d.demande);
     });
   });
 
@@ -254,14 +300,19 @@ function brancherEvenements(app) {
 
     coche.addEventListener('change', async () => {
       const tache = trouverTache(id);
+      coche.disabled = true; // anti double-clic : pas de 2e PATCH concurrent avant la réponse
       try {
-        await api.majTache(id, { fait: coche.checked });
-        tache.fait = coche.checked;
-        bloc.classList.toggle('is-done', coche.checked);
+        // fix-ok: feature badge/signature — la réponse porte fait_par/le, on l'applique + rafraîchit
+        const maj = await api.majTache(id, { fait: coche.checked });
+        Object.assign(tache, maj);
+        bloc.classList.toggle('is-done', tache.fait);
+        majSignatures(bloc, tache);
         recalculer(app);
       } catch (e) {
         coche.checked = !coche.checked; // rollback visuel
         toast(e.message, 'err');
+      } finally {
+        coche.disabled = false;
       }
     });
 
@@ -270,16 +321,22 @@ function brancherEvenements(app) {
     comm.addEventListener('input', () => {
       const tache = trouverTache(id);
       comm.classList.toggle('is-dirty', comm.value !== tache.commentaire);
+      comm.classList.remove('is-error'); // une nouvelle frappe efface l'état d'erreur
     });
     comm.addEventListener('blur', async () => {
       const tache = trouverTache(id);
       if (comm.value === tache.commentaire) return;
       try {
-        await api.majTache(id, { commentaire: comm.value });
-        tache.commentaire = comm.value;
-        comm.classList.remove('is-dirty');
+        // fix-ok: feature badge/signature — la réponse porte commentaire_par/le, on l'applique + rafraîchit
+        const maj = await api.majTache(id, { commentaire: comm.value });
+        Object.assign(tache, maj);
+        comm.classList.remove('is-dirty', 'is-error');
+        majSignatures(bloc, tache);
       } catch (e) {
-        toast(e.message, 'err');
+        // Échec réseau : on GARDE le texte marqué non-sauvegardé + un état d'erreur
+        // visible et un toast explicite — pas de perte silencieuse.
+        comm.classList.add('is-dirty', 'is-error');
+        toast('Commentaire non sauvegardé — réessayez (réseau ?).', 'err');
       }
     });
   });
@@ -349,6 +406,85 @@ function majCompteurDemandes(app) {
   app.querySelector('[data-compteur-demandes]').textContent = `${actives} / ${fiche.demandes.length}`;
 }
 
+/**
+ * Bascule une demande d'accès et gère la cascade de tâches.
+ * - Activation → le serveur crée les sous-tâches ; on re-rend la page (la
+ *   section « Mise en place des accès » apparaît).
+ * - Désactivation avec des sous-tâches déjà faites → le serveur renvoie
+ *   `confirmation` SANS rien modifier ; on demande confirmation puis on relance
+ *   avec `confirmer: true`.
+ * `confirmer` est passé tel quel à l'API (transite jusqu'à majDemande côté serveur).
+ */
+async function basculerDemande(app, id, nouvelle, confirmer = false) {
+  if (demandesEnVol.has(id)) return; // une bascule de cette demande est déjà en vol
+  demandesEnVol.add(id);
+  try {
+    const maj = await api.majDemande(id, { demande: nouvelle, confirmer });
+
+    // Garde-fou : le serveur réclame une confirmation (tâches déjà faites).
+    if (maj.confirmation) {
+      const { faites, total } = maj.confirmation;
+      demanderConfirmationRetrait(faites, total, () => basculerDemande(app, id, nouvelle, true));
+      return;
+    }
+
+    // Le serveur renvoie la fiche entière (la section accès a pu apparaître/disparaître)
+    // → on re-rend toute la vue pour rester cohérent, en conservant l'état déplié.
+    if (maj.fiche) {
+      const ouverts = etatSectionsOuvertes(app);
+      fiche = maj.fiche;
+      rerendreCorps(app);
+      restaurerSectionsOuvertes(app, ouverts);
+    }
+  } catch (err) {
+    toast(err.message, 'err');
+  } finally {
+    demandesEnVol.delete(id);
+  }
+}
+
+/** Modale de confirmation avant de retirer des tâches d'accès déjà traitées. */
+function demanderConfirmationRetrait(faites, total, onConfirme) {
+  ouvrirModale({
+    titre: 'Retirer cette demande ?',
+    corpsHTML: `<p>Cette demande a généré <strong>${total}</strong> tâche(s), dont <strong>${faites}</strong> déjà faite(s). Les retirer supprimera définitivement ces tâches et leur avancement.</p>`,
+    piedHTML: `
+      <button class="bouton bouton--fantome" data-fermer>Annuler</button>
+      <button class="bouton" id="confirmer-retrait" style="background:var(--rouge)">Retirer quand même</button>`,
+    onMonte: (fond) => {
+      fond.querySelector('#confirmer-retrait').addEventListener('click', () => {
+        fermerModale();
+        onConfirme();
+      });
+    },
+  });
+}
+
+/** Capture l'état déplié/replié des sections AVANT re-rendu, par clé.
+ *  On distingue « connue + ouverte/fermée » de « inconnue » : une section
+ *  nouvellement apparue (ex. « accès ») garde alors son état par défaut. */
+function etatSectionsOuvertes(app) {
+  const etats = new Map();
+  app.querySelectorAll('.section').forEach((s) => {
+    const cle = s.dataset.section || s.dataset.partie;
+    if (cle) etats.set(cle, s.classList.contains('is-open'));
+  });
+  return etats;
+}
+
+/** Réapplique l'état déplié des sections déjà présentes avant le re-rendu ;
+ *  une section inconnue (nouvelle) conserve son état par défaut du HTML. */
+function restaurerSectionsOuvertes(app, etats) {
+  app.querySelectorAll('.section').forEach((s) => {
+    const cle = s.dataset.section || s.dataset.partie;
+    if (!etats.has(cle)) return; // section nouvelle → on ne touche pas
+    const doitEtreOuvert = etats.get(cle);
+    const entete = s.querySelector('[data-toggle]');
+    s.classList.toggle('is-open', doitEtreOuvert);
+    if (entete) entete.setAttribute('aria-expanded', String(doitEtreOuvert));
+  });
+}
+
 function majHero() {
   document.getElementById('hero-nom').textContent = nomComplet(fiche);
   document.getElementById('hero-sous').textContent = sousTitreHero();
@@ -381,6 +517,12 @@ function confirmerSuppression() {
 }
 
 /* ----------------------------- Utilitaires ------------------------------- */
+// fix-ok: feature badge/signature — re-rend les signatures d'une tâche après une action
+function majSignatures(bloc, tache) {
+  const zone = bloc.querySelector('[data-signatures]');
+  if (zone) zone.innerHTML = signaturesTache(tache);
+}
+
 function trouverTache(id) {
   for (const p of fiche.parties) {
     const t = p.taches.find((x) => x.id === id);

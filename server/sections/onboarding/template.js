@@ -11,6 +11,16 @@
  *    leur propre copie).
  */
 
+// fix-ok: scout #11 (sortir les valeurs en dur) + feature #2 (échéances) — édition
+//          multi-points volontaire, cause connue (cadrage scout), pas un blind-fix.
+
+// --- Config extraite (était codée en dur dans les libellés/détails) --------
+// URL interne du Rapport d'Activité : centralisée ici (portabilité + plus
+// d'adresse interne disséminée dans les chaînes de détails).
+const RA_URL = 'ra.intranet.com';
+// Personne physique récurrente : un changement de nom ne doit plus être silencieux.
+const RESP_RH = 'Laurence';
+
 // Les 4 grandes étapes de l'onboarding, dans l'ordre du parcours.
 export const PARTIES = [
   {
@@ -54,6 +64,70 @@ export const DEMANDES = [
   "Accès Rapport d'Activité (RA)",
 ];
 
+// Section dédiée aux tâches générées par les demandes d'accès cochées.
+// N'apparaît dans la fiche que si au moins une tâche d'accès existe.
+export const PARTIE_ACCES = {
+  cle: 'acces',
+  titre: 'Mise en place des accès',
+  icone: '🔑',
+  sousTitre: 'Procédure issue des demandes cochées',
+  relais: null,
+};
+
+// Responsable par défaut affecté aux tâches d'accès générées.
+export const RESPONSABLE_ACCES = 'IT / SI';
+
+/**
+ * Mini-checklist GÉNÉRIQUE par demande d'accès : activer la demande crée ces
+ * sous-tâches dans la section « Mise en place des accès » ; les désactiver les
+ * retire. Clé = libellé EXACT de la demande (cf. DEMANDES ci-dessus).
+ *
+ * 👉 Contenu volontairement générique au départ : à peaufiner librement ici
+ *    (les nouvelles bascules de demande en tiendront compte ; les tâches déjà
+ *    créées gardent leur libellé jusqu'à un re-cochage).
+ *
+ * `defaut` sert de gabarit de repli si une demande n'a pas d'entrée dédiée.
+ */
+export const TACHES_ACCES = {
+  defaut: [
+    { libelle: 'Demander la création de l’accès' },
+    { libelle: 'Configurer l’accès' },
+    { libelle: 'Communiquer les identifiants au collaborateur' },
+    { libelle: 'Vérifier le bon fonctionnement' },
+  ],
+};
+
+/** Retourne le mini-checklist d'une demande (gabarit dédié ou `defaut`). */
+export function tachesPourDemande(libelle) {
+  return TACHES_ACCES[libelle] || TACHES_ACCES.defaut;
+}
+
+/**
+ * Feature #2 — pilotage par le temps : échéance RELATIVE à la date d'entrée.
+ * Clé = libellé EXACT d'une tâche ; valeur = décalage en jours (négatif = AVANT
+ * l'arrivée, 0 = jour J, positif = après). Tâche absente = pas d'échéance.
+ *
+ * L'échéance réelle et le statut « en retard » sont calculés À LA LECTURE
+ * (getFiche : date_entree + offset) — rien n'est figé en base. Donc ajuster ces
+ * offsets reprojette toutes les fiches, y compris existantes.
+ *
+ * 👉 Volontairement restreint aux tâches sensibles au temps ; étendre ici.
+ */
+export const OFFSETS_TACHE = {
+  'Valider le besoin matériel avec la direction': -7,
+  'Valider et commander le poste de travail et les accessoires': -5,
+  'Création du compte AD': 0,
+  'Préparer la fiche d’identification et la transmettre': 0,
+  'Faire signer la charte informatique': 1,
+};
+
+/** Décalage d'échéance (jours) d'une tâche, ou null si elle n'est pas datée. */
+export function offsetPour(libelle) {
+  return Object.prototype.hasOwnProperty.call(OFFSETS_TACHE, libelle)
+    ? OFFSETS_TACHE[libelle]
+    : null;
+}
+
 // Tâches par partie. type_profil n'est réellement utilisé que pour l'exploitation.
 export const TACHES = {
   administratif: [
@@ -78,18 +152,18 @@ export const TACHES = {
     {
       libelle: 'Faire signer la charte informatique',
       details: 'Charte signée par le collaborateur et archivée dans le dossier RH.',
-      responsable: 'Laurence',
+      responsable: RESP_RH,
     },
     {
       libelle: 'Staff&Go',
       details: 'Création du compte Staff&Go.',
-      responsable: 'Laurence',
+      responsable: RESP_RH,
     },
     {
       libelle: 'Faire signer le règlement intérieur',
       details:
         'Remise du règlement intérieur et signature de réception / prise de connaissance.',
-      responsable: 'Laurence',
+      responsable: RESP_RH,
     },
   ],
 
@@ -207,7 +281,7 @@ export const TACHES = {
     {
       libelle: 'Config. Rapport d’Activité (RA)',
       details:
-        'Créer le compte sur ra.intranet.com. Associer le modèle d’heures et le service. Identifiants : calqués sur l’AD.',
+        `Créer le compte sur ${RA_URL}. Associer le modèle d’heures et le service. Identifiants : calqués sur l’AD.`,
       // L'Excel place cette tâche sous la section Exploitation mais en attribue la
       // responsabilité au Judiciaire (et laisse la colonne « Type profil » vierge).
       responsable: 'Judiciaire',

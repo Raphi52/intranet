@@ -27,6 +27,29 @@ export function initiales(prenom = '', nom = '') {
   return (p + n) || '👤';
 }
 
+/**
+ * Badge de signature : prénom COMPLET + initiale du nom suivie d'un point
+ * (ex. « Raphaël V. »). Distinct de `initiales()` (qui donne « RV »).
+ */
+export function badgeNom(prenom = '', nom = '') {
+  const p = (prenom || '').trim();
+  const n = (nom || '').trim();
+  const ini = n ? `${n[0].toUpperCase()}.` : '';
+  return [p, ini].filter(Boolean).join(' ') || '?';
+}
+
+/**
+ * Formate un horodatage SQLite (« AAAA-MM-JJ HH:MM:SS », UTC) en « JJ/MM HH:MM ».
+ * Renvoie la valeur brute si le format est inattendu.
+ */
+export function formatHorodatage(s) {
+  if (!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return String(s);
+  const [, , mo, j, h, mi] = m;
+  return `${j}/${mo} ${h}:${mi}`;
+}
+
 export function nomComplet(c) {
   const nc = `${c.prenom || ''} ${c.nom || ''}`.trim();
   return nc || 'Nouveau collaborateur';

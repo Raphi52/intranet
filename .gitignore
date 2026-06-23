@@ -10,3 +10,6 @@ data/*.db-shm
 *.log
 .DS_Store
 .env
+
+# Captures de vérification UI (régénérables via tools/ui-capture.mjs)
+tools/captures/

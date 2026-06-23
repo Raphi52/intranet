@@ -1,9 +1,18 @@
 /** Wrapper fetch générique du portail (partagé par toutes les sections). */
 
+import { badgeOperateur } from './identite.js';
+
 export async function requete(url, options = {}) {
+  // Signature de l'opérateur courant : en-tête X-Operateur (badge « Prénom N. »,
+  // encodé pour rester ASCII). Le serveur l'attribue aux actions.
+  const badge = badgeOperateur();
   const reponse = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(badge ? { 'X-Operateur': encodeURIComponent(badge) } : {}),
+      ...(options.headers || {}),
+    },
   });
   if (!reponse.ok) {
     let message = `Erreur ${reponse.status}`;

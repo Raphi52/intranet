@@ -1,0 +1,44 @@
+# =============================================================================
+# Portail Amitel — conteneur autonome, port publié.
+#
+# Coexiste avec d'autres conteneurs sur le serveur cible sans dépendre de leur
+# infra : il publie un port hôte (défaut 8080) et persiste sa base SQLite dans
+# un volume nommé. Brancher au reste (reverse proxy, réseau…) reste à ta main.
+#
+#   docker compose up -d --build      # build + démarrage
+#   HOST_PORT=9000 docker compose up -d   # autre port hôte
+# =============================================================================
+
+services:
+  portail:
+    build: .
+    image: portail-amitel:latest
+    container_name: portail-amitel
+    restart: unless-stopped
+    ports:
+      # HOST_PORT (hôte) -> 3000 (conteneur). Défaut 8080.
+      - "${HOST_PORT:-8080}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      PORTAIL_DB: /app/data/onboarding.db
+      # Fuseau pour l'horodatage des signatures (datetime SQLite reste en UTC).
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # La base (onboarding.db + fichiers WAL) survit aux recréations du conteneur.
+      - portail-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode<400?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  portail-data:

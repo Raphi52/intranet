@@ -1,0 +1,23 @@
+# Dépendances : RECOMPILÉES dans l'image (les binaires natifs de l'hôte —
+# notamment Windows — sont incompatibles avec le conteneur Linux).
+node_modules
+
+# Données locales (la base vit dans un VOLUME, jamais dans l'image).
+data
+
+# Git & méta
+.git
+.gitignore
+
+# Artefacts Docker (inutiles dans le contexte de build)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Logs & divers
+*.log
+.env
+.DS_Store
+
+# Outils de dev hors-runtime
+tools

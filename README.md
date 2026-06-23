@@ -49,6 +49,43 @@ Puis ouvrez **http://localhost:3000**.
 > Astuce : `npm run dev` redémarre automatiquement à chaque modification.
 > Le port peut être changé via la variable d'environnement `PORT`.
 
+## 🐳 Docker
+
+Conteneur **autonome** (port publié), pensé pour coexister avec d'autres
+conteneurs sur le serveur cible. Image multi-stage : `better-sqlite3` est compilé
+dans un stage jetable, l'image finale reste légère et tourne en **non-root**.
+
+```bash
+docker compose up -d --build        # build + démarrage (port 8080)
+HOST_PORT=9000 docker compose up -d  # publier sur un autre port hôte
+docker compose logs -f               # suivre les logs
+docker compose down                  # arrêter (la base est CONSERVÉE)
+```
+
+Puis ouvrez **http://localhost:8080** (ou `http://<serveur>:8080`).
+
+- **Persistance** : la base SQLite vit dans le volume nommé **`portail-data`**
+  (monté sur `/app/data`). Elle survit aux `down`/`up` et aux reconstructions.
+- ⚠️ `docker compose down -v` **supprime** ce volume → perte des données.
+- **Variables** : `HOST_PORT` (port hôte, défaut `8080`), `TZ` (fuseau, défaut
+  `Europe/Paris`).
+
+### Sauvegarde / restauration du volume
+
+```bash
+# Sauvegarde -> sauvegarde-portail.tgz
+docker run --rm -v portail-data:/data -v "$PWD":/sortie alpine \
+  tar czf /sortie/sauvegarde-portail.tgz -C /data .
+
+# Restauration
+docker run --rm -v portail-data:/data -v "$PWD":/sortie alpine \
+  tar xzf /sortie/sauvegarde-portail.tgz -C /data
+```
+
+> Pour repartir d'une base existante (poste de dev → conteneur), remplacez le
+> volume nommé par un bind-mount dans `docker-compose.yml` :
+> `- ./data:/app/data`.
+
 ## 🗂️ Structure du projet
 
 ```

@@ -33,6 +33,18 @@ const idValide = (req, res) => {
   return id;
 };
 
+// Valide les champs à liste fermée + le format des dates. Renvoie un message
+// d'erreur (string) ou null si tout est bon. Champs absents = ignorés (maj partielle).
+const erreurValidation = (body = {}) => {
+  if (body.service && !SERVICES.includes(body.service)) return 'Service invalide.';
+  if (body.type_contrat && !TYPES_CONTRAT.includes(body.type_contrat))
+    return 'Type de contrat invalide.';
+  const dateOk = (d) => !d || /^\d{4}-\d{2}-\d{2}$/.test(d);
+  if (!dateOk(body.date_entree) || !dateOk(body.date_sortie))
+    return 'Date invalide (format AAAA-MM-JJ attendu).';
+  return null;
+};
+
 // --- Métadonnées (services, contrats, structure des parties) --------------
 router.get('/meta', (_req, res) => {
   res.json({
@@ -54,11 +66,14 @@ router.get('/collaborateurs', (_req, res) => {
 });
 
 router.post('/collaborateurs', (req, res) => {
-  const { nom, prenom } = req.body || {};
+  const body = req.body || {};
+  const { nom, prenom } = body;
   if (!nom?.trim() && !prenom?.trim()) {
     return res.status(400).json({ erreur: 'Le nom ou le prénom est requis.' });
   }
-  const id = creerCollaborateur(req.body || {});
+  const err = erreurValidation(body);
+  if (err) return res.status(400).json({ erreur: err });
+  const id = creerCollaborateur(body, req.operateur);
   res.status(201).json(getFiche(id));
 });
 
@@ -72,7 +87,9 @@ router.get('/collaborateurs/:id', (req, res) => {
 router.put('/collaborateurs/:id', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
-  const fiche = majIdentite(id, req.body || {});
+  const err = erreurValidation(req.body || {});
+  if (err) return res.status(400).json({ erreur: err });
+  const fiche = majIdentite(id, req.body || {}, req.operateur);
   return fiche ? res.json(fiche) : introuvable(res);
 });
 
@@ -87,14 +104,14 @@ router.delete('/collaborateurs/:id', (req, res) => {
 router.patch('/taches/:id', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
-  const t = majTache(id, req.body || {});
+  const t = majTache(id, req.body || {}, req.operateur);
   return t ? res.json(t) : res.status(404).json({ erreur: 'Tâche introuvable' });
 });
 
 router.patch('/demandes/:id', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
-  const d = majDemande(id, req.body || {});
+  const d = majDemande(id, req.body || {}, req.operateur);
   return d ? res.json(d) : res.status(404).json({ erreur: 'Demande introuvable' });
 });
 

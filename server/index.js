@@ -42,6 +42,21 @@ app.use((req, _res, next) => {
   next();
 });
 
+// --- Signature opérateur (identification DÉCLARATIVE, pas une auth) --------
+// Le client transmet le badge « Prénom N. » via l'en-tête X-Operateur (encodé).
+// Sert à attribuer/signer les actions ; NON vérifié (réseau interne de confiance).
+app.use((req, _res, next) => {
+  const brut = req.get('X-Operateur') || '';
+  let badge = '';
+  try {
+    badge = decodeURIComponent(brut);
+  } catch {
+    badge = brut; // en-tête malformé : on garde le brut plutôt que d'échouer
+  }
+  req.operateur = badge.trim().slice(0, 120);
+  next();
+});
+
 // --- Sections du portail (montées dynamiquement) --------------------------
 enregistrerSections(app);
 
