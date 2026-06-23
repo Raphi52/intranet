@@ -1,45 +1,62 @@
 /**
- * Identité de l'OPÉRATEUR (la personne qui remplit le portail — ≠ le nouveau
- * collaborateur). Identification DÉCLARATIVE et locale (localStorage) : ce n'est
- * PAS une authentification (aucun mot de passe, n'importe quel nom accepté).
- * Sert à SIGNER les actions : chaque requête porte le badge « Prénom N. ».
+ * Identité de l'OPÉRATEUR — désormais une VRAIE authentification (session serveur).
+ * Remplace l'ancienne identité déclarative (nom en localStorage). Le cookie de
+ * session (HttpOnly) est géré par le navigateur ; ce module expose le compte courant
+ * + connexion / déconnexion. Plus aucun secret côté client.
  */
-import { badgeNom } from './ui.js';
 
-const CLE = 'portail.operateur';
+let _moi = null; // compte courant en cache (rempli par chargerMoi)
 
-/** Opérateur courant `{ prenom, nom }`, ou `null` si non identifié / invalide. */
-export function getOperateur() {
+/** Compte courant déjà chargé (synchrone), ou null. */
+export function moiCourant() {
+  return _moi;
+}
+export function estAdmin() {
+  return _moi?.role === 'admin';
+}
+
+/** Récupère le compte courant depuis la session serveur (GET /api/auth/me). */
+export async function chargerMoi() {
   try {
-    const brut = localStorage.getItem(CLE);
-    if (!brut) return null;
-    const o = JSON.parse(brut);
-    const prenom = (o?.prenom || '').trim();
-    const nom = (o?.nom || '').trim();
-    if (!prenom || !nom) return null; // les DEUX sont requis
-    return { prenom, nom };
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    _moi = r.ok ? await r.json() : null;
   } catch {
-    return null;
+    _moi = null;
   }
+  return _moi;
 }
 
-/** Enregistre l'opérateur (longueurs plafonnées). Renvoie l'objet normalisé. */
-export function setOperateur(prenom, nom) {
-  const op = {
-    prenom: (prenom || '').trim().slice(0, 60),
-    nom: (nom || '').trim().slice(0, 60),
-  };
-  localStorage.setItem(CLE, JSON.stringify(op));
-  return op;
+/** Connexion. Renvoie le compte si OK, sinon lève une Error (message serveur). */
+export async function connexion(email, motDePasse) {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password: motDePasse }),
+  });
+  if (!r.ok) {
+    const corps = await r.json().catch(() => null);
+    throw new Error(corps?.erreur || `Erreur ${r.status}`);
+  }
+  _moi = await r.json();
+  return _moi;
 }
 
-/** Oublie l'opérateur courant (déclenche le gate au prochain rendu). */
-export function effacerOperateur() {
-  localStorage.removeItem(CLE);
+/** Déconnexion (détruit la session serveur + le cookie). */
+export async function deconnexion() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch {
+    /* ignore */
+  }
+  _moi = null;
 }
 
-/** Badge « Prénom N. » de l'opérateur courant, ou '' si non identifié. */
+/** Badge « Prénom N. » du compte courant (affichage), ou '' si déconnecté. */
 export function badgeOperateur() {
-  const op = getOperateur();
-  return op ? badgeNom(op.prenom, op.nom) : '';
+  if (!_moi?.nom) return _moi?.email || '';
+  const parts = String(_moi.nom).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return _moi.email || '';
+  const dernier = parts.length > 1 ? parts[parts.length - 1] : '';
+  return dernier ? `${parts[0]} ${dernier[0].toUpperCase()}.` : parts[0];
 }

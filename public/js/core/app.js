@@ -1,24 +1,32 @@
 /**
  * Portail Amitel — shell + routeur (par hash).
  *
- * Le routeur ne connaît AUCUNE section en propre : il lit le registre front
- * (`sections/index.js`), construit la navigation, et dispatche
- *   #/<idSection>/<sous-route>   →   section.render(conteneur, sousRoute)
- * `#/` (racine) affiche l'accueil du portail (menu des sections).
+ * Le routeur lit le registre front (`sections/index.js`), construit la navigation
+ * et dispatche #/<idSection>/<sous-route> → section.render(conteneur, sousRoute).
+ * Accès protégé par une VRAIE authentification (session serveur) : pas de session
+ * → écran de connexion.
  */
 
 import { sections } from '../sections/index.js';
 import { renduAccueil } from './home.js';
-import { toast, echappe, badgeNom } from './ui.js';
-import { getOperateur, setOperateur, effacerOperateur, badgeOperateur } from './identite.js';
+import { toast, echappe } from './ui.js';
+import { chargerMoi, moiCourant, connexion, deconnexion, badgeOperateur, estAdmin } from './identite.js';
 
 const app = document.getElementById('app');
 const parId = Object.fromEntries(sections.map((s) => [s.id, s]));
 
+// Une section peut être réservée aux admins (manifest `adminSeul: true`).
+const visibleEnNav = (s) => !s.adminSeul || estAdmin();
+
 function construireNav(idActif) {
   const nav = document.getElementById('portail-nav');
   if (!nav) return;
+  if (!moiCourant()) {
+    nav.innerHTML = '';
+    return;
+  }
   nav.innerHTML = sections
+    .filter(visibleEnNav)
     .map(
       (s) =>
         `<a class="nav__lien ${s.id === idActif ? 'is-active' : ''}" href="#/${s.id}/">` +
@@ -36,78 +44,66 @@ function vue404() {
   </div>`;
 }
 
-/* ----------------------- Gate d'identification --------------------------- */
-// Aucun accès au portail (quelle que soit la section / l'URL) tant que
-// l'opérateur n'a pas saisi son prénom ET son nom. Identification déclarative.
-function vueGate() {
+/* ----------------------- Écran de connexion ------------------------------ */
+function vueLogin() {
   return `
     <div class="gate">
       <div class="gate__carte">
-        <div class="gate__logo" aria-hidden="true">🪪</div>
-        <h1>Qui êtes-vous ?</h1>
-        <p>Indiquez votre prénom et votre nom pour accéder au portail.
-           Vos actions seront signées de votre badge.</p>
-        <form id="gate-form" class="gate__form">
+        <div class="gate__logo" aria-hidden="true">🔐</div>
+        <h1>Connexion</h1>
+        <p>Identifiez-vous pour accéder au portail Amitel.</p>
+        <form id="login-form" class="gate__form">
           <div class="champ">
-            <label for="gate-prenom">Prénom</label>
-            <input id="gate-prenom" autocomplete="given-name" required />
+            <label for="login-email">E-mail</label>
+            <input id="login-email" type="email" autocomplete="username" required />
           </div>
           <div class="champ">
-            <label for="gate-nom">Nom</label>
-            <input id="gate-nom" autocomplete="family-name" required />
+            <label for="login-mdp">Mot de passe</label>
+            <input id="login-mdp" type="password" autocomplete="current-password" required />
           </div>
-          <button class="bouton" type="submit">Entrer dans le portail →</button>
-          <p class="gate__apercu" id="gate-apercu" aria-live="polite"></p>
+          <button class="bouton" type="submit">Se connecter →</button>
+          <p class="gate__apercu" id="login-erreur" aria-live="polite"></p>
         </form>
       </div>
     </div>`;
 }
 
-function brancherGate() {
-  const prenom = document.getElementById('gate-prenom');
-  const nom = document.getElementById('gate-nom');
-  const apercu = document.getElementById('gate-apercu');
-
-  const majApercu = () => {
-    const p = prenom.value.trim();
-    const n = nom.value.trim();
-    apercu.textContent = p || n ? `Votre badge : ${badgeNom(p, n)}` : '';
-  };
-  prenom.addEventListener('input', majApercu);
-  nom.addEventListener('input', majApercu);
-
-  document.getElementById('gate-form').addEventListener('submit', (e) => {
+function brancherLogin() {
+  const form = document.getElementById('login-form');
+  const erreur = document.getElementById('login-erreur');
+  const email = document.getElementById('login-email');
+  email?.focus();
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!prenom.value.trim() || !nom.value.trim()) {
-      toast('Prénom et nom sont requis.', 'err');
-      return;
+    erreur.textContent = '';
+    try {
+      await connexion(email.value.trim(), document.getElementById('login-mdp').value);
+      routeur(); // session ouverte → rejoue la route demandée
+    } catch (err) {
+      erreur.textContent = err.message;
     }
-    setOperateur(prenom.value, nom.value);
-    afficherBadge();
-    routeur(); // rejoue la route demandée, désormais autorisée
   });
-  prenom.focus();
 }
 
-/** Peuple (ou vide) le badge opérateur dans l'en-tête. */
+/** Peuple (ou vide) le badge opérateur + bouton déconnexion dans l'en-tête. */
 function afficherBadge() {
   const zone = document.getElementById('entete-actions');
   if (!zone) return;
   const badge = badgeOperateur();
-  if (!badge) {
+  if (!moiCourant() || !badge) {
     zone.innerHTML = '';
     return;
   }
   zone.innerHTML = `
-    <span class="op-badge" title="Vos actions sont signées de ce badge">
+    <span class="op-badge" title="Connecté — vos actions sont signées de ce badge">
       <span class="op-badge__pastille" aria-hidden="true">${echappe(badge[0])}</span>
       <span class="op-badge__nom">${echappe(badge)}</span>
     </span>
-    <button class="bouton bouton--fantome bouton--sm" id="op-changer">Changer</button>`;
-  zone.querySelector('#op-changer').addEventListener('click', () => {
-    effacerOperateur();
-    afficherBadge();
-    routeur(); // retombe sur le gate
+    <button class="bouton bouton--fantome bouton--sm" id="op-deconnexion">Déconnexion</button>`;
+  zone.querySelector('#op-deconnexion').addEventListener('click', async () => {
+    await deconnexion();
+    location.hash = '#/';
+    routeur();
   });
 }
 
@@ -115,14 +111,13 @@ async function routeur() {
   const hash = location.hash || '#/';
   window.scrollTo(0, 0);
 
-  // Gate : pas d'opérateur identifié → on bloque tout accès (y compris une URL
-  // de section saisie directement) et on affiche l'écran de saisie.
-  if (!getOperateur()) {
+  // Pas de session valide → écran de connexion (bloque tout accès, même une URL directe).
+  if (!moiCourant()) {
     construireNav(null);
     const zone = document.getElementById('entete-actions');
     if (zone) zone.innerHTML = '';
-    app.innerHTML = vueGate();
-    brancherGate();
+    app.innerHTML = vueLogin();
+    brancherLogin();
     return;
   }
   afficherBadge();
@@ -130,17 +125,15 @@ async function routeur() {
   app.innerHTML = '<div class="chargement">Chargement…</div>';
 
   try {
-    // Accueil du portail
     if (hash === '#/' || hash === '#' || hash === '') {
       construireNav(null);
-      await renduAccueil(app, sections);
+      await renduAccueil(app, sections.filter(visibleEnNav));
       return;
     }
 
-    // #/<id>/<reste>
     const m = hash.match(/^#\/([^/]+)\/?(.*)$/);
     const section = m && parId[m[1]];
-    if (!section) {
+    if (!section || (section.adminSeul && !estAdmin())) {
       construireNav(null);
       app.innerHTML = vue404();
       return;
@@ -159,8 +152,14 @@ async function routeur() {
   }
 }
 
-function demarrer() {
+async function demarrer() {
+  await chargerMoi(); // récupère la session existante (cookie) au chargement
   window.addEventListener('hashchange', routeur);
+  // Session expirée détectée par un appel API → on recharge l'identité et réaffiche.
+  window.addEventListener('portail:401', async () => {
+    await chargerMoi();
+    routeur();
+  });
   routeur();
 }
 

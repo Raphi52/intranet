@@ -1,17 +1,15 @@
 /**
- * Section TICKETING — routeur Express.
+ * Section TICKETING — routeur Express (monté sous /api/ticketing, derrière l'auth).
  *
- * Monté sous `/api/ticketing`. Identité déclarative : `req.operateur` (badge
- * « Prénom N. ») signe les actions et pilote la visibilité des projets privés.
+ * Identité VÉRIFIÉE (session) : `req.user` (compte) pilote la visibilité/appartenance
+ * RÉELLE des projets privés (par id), et `req.operateur` (badge dérivé de la session)
+ * signe les actions. Le registre des personnes = les comptes `users` (gérés par l'admin).
  */
 
 import { Router } from 'express';
 
 import {
-  creerPersonne,
   listerPersonnes,
-  majPersonne,
-  supprimerPersonne,
   creerProjet,
   getProjet,
   listerProjets,
@@ -30,7 +28,6 @@ import {
   notifProprietaire,
   statistiques,
   projetVisiblePour,
-  personneDuBadge,
   statutValide,
   ticketProjet,
   personneExiste,
@@ -39,19 +36,18 @@ import { STATUTS_DEFAUT, PRIORITES, TYPES, ROLES } from './template.js';
 
 const router = Router();
 
-// Couleur projet : format hexadécimal strict (#RRGGBB) — bloque l'injection CSS via l'API directe.
 const couleurValide = (c) => !c || /^#[0-9A-Fa-f]{6}$/.test(c);
 
-// Gardes de visibilité honor-system pour l'ACCÈS UNITAIRE (lecture ET mutation) : un projet/ticket
-// privé n'est touchable que par un membre. 404 (ne révèle pas l'existence). Renvoie false si bloqué.
+// Gardes de visibilité (ACCÈS UNITAIRE, lecture ET mutation) par id utilisateur vérifié :
+// un projet/ticket privé n'est touchable que par un membre. 404 sinon (ne révèle pas l'existence).
 const projetVisibleOuStop = (id, req, res) => {
-  if (projetVisiblePour(id, req.operateur)) return true;
+  if (projetVisiblePour(id, req.user.id)) return true;
   res.status(404).json({ erreur: 'Projet introuvable' });
   return false;
 };
 const ticketVisibleOuStop = (id, req, res) => {
   const pid = ticketProjet(id);
-  if (pid !== null && projetVisiblePour(pid, req.operateur)) return true;
+  if (pid !== null && projetVisiblePour(pid, req.user.id)) return true;
   res.status(404).json({ erreur: 'Ticket introuvable' });
   return false;
 };
@@ -71,41 +67,23 @@ router.get('/meta', (_req, res) => {
   res.json({ statutsDefaut: STATUTS_DEFAUT, priorites: PRIORITES, types: TYPES, roles: ROLES });
 });
 
-// --- Personnes (registre) --------------------------------------------------
+// --- Personnes assignables (= comptes users actifs ; gestion via admin auth) ---
 router.get('/personnes', (_req, res) => res.json(listerPersonnes()));
-router.post('/personnes', (req, res) => {
-  const { nom, email } = req.body || {};
-  if (!nom?.trim()) return res.status(400).json({ erreur: 'Le nom est requis.' });
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ erreur: 'E-mail invalide.' });
-  res.status(201).json(creerPersonne({ nom, email }));
-});
-router.put('/personnes/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  const p = majPersonne(id, req.body || {});
-  return p ? res.json(p) : res.status(404).json({ erreur: 'Personne introuvable' });
-});
-router.delete('/personnes/:id', (req, res) => {
-  const id = idValide(req, res);
-  if (id === null) return;
-  return supprimerPersonne(id) ? res.status(204).end() : res.status(404).json({ erreur: 'Personne introuvable' });
-});
 
 // --- Projets ---------------------------------------------------------------
-router.get('/projets', (req, res) => res.json(listerProjets(req.operateur)));
+router.get('/projets', (req, res) => res.json(listerProjets(req.user.id)));
 router.post('/projets', (req, res) => {
   const body = req.body || {};
   if (!body.nom?.trim()) return res.status(400).json({ erreur: 'Le nom du projet est requis.' });
   if (!body.cle?.trim()) return res.status(400).json({ erreur: 'La clé du projet est requise.' });
   if (!couleurValide(body.couleur)) return res.status(400).json({ erreur: 'Couleur invalide (format #RRGGBB attendu).' });
-  const id = creerProjet(body, req.operateur);
+  const id = creerProjet(body, req.operateur, req.user.id);
   res.status(201).json(getProjet(id));
 });
 router.get('/projets/:id', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
-  // Accès unitaire : un projet privé n'est lisible que par un membre (404 sinon, ne révèle pas l'existence).
-  if (!projetVisiblePour(id, req.operateur)) return res.status(404).json({ erreur: 'Projet introuvable' });
+  if (!projetVisiblePour(id, req.user.id)) return res.status(404).json({ erreur: 'Projet introuvable' });
   const p = getProjet(id);
   return p ? res.json(p) : res.status(404).json({ erreur: 'Projet introuvable' });
 });
@@ -129,7 +107,9 @@ router.post('/projets/:id/membres', (req, res) => {
   if (!projetVisibleOuStop(id, req, res)) return;
   const personId = intOuNull(req.body?.person_id);
   if (!personId) return res.status(400).json({ erreur: 'person_id requis.' });
-  const membres = ajouterMembre(id, personId, req.body?.role);
+  const role = req.body?.role;
+  if (role && !ROLES.includes(role)) return res.status(400).json({ erreur: 'Rôle invalide.' });
+  const membres = ajouterMembre(id, personId, role);
   return membres ? res.json(membres) : res.status(404).json({ erreur: 'Projet ou personne introuvable' });
 });
 router.delete('/projets/:id/membres/:personId', (req, res) => {
@@ -152,7 +132,7 @@ router.get('/tickets', (req, res) => {
     q: req.query.q || undefined,
     retard: req.query.retard === '1' || req.query.retard === 'true',
   };
-  res.json(listerTickets(f, req.operateur));
+  res.json(listerTickets(f, req.user.id));
 });
 router.post('/projets/:id/tickets', (req, res) => {
   const id = idValide(req, res);
@@ -170,7 +150,6 @@ router.post('/projets/:id/tickets', (req, res) => {
     if (!ticketId) return res.status(404).json({ erreur: 'Projet introuvable' });
     res.status(201).json(getTicket(ticketId));
   } catch (e) {
-    // course sur le numéro (UNIQUE project_id,numero) en multi-process → conflit ; toute autre erreur remonte.
     if (String(e?.code || '').startsWith('SQLITE_CONSTRAINT')) {
       return res.status(409).json({ erreur: 'Conflit lors de la création du ticket, réessayez.' });
     }
@@ -182,8 +161,7 @@ router.get('/tickets/:id', (req, res) => {
   if (id === null) return;
   const t = getTicket(id);
   if (!t) return res.status(404).json({ erreur: 'Ticket introuvable' });
-  // Accès unitaire : ticket d'un projet privé masqué aux non-membres (404).
-  if (!projetVisiblePour(t.project_id, req.operateur)) return res.status(404).json({ erreur: 'Ticket introuvable' });
+  if (!projetVisiblePour(t.project_id, req.user.id)) return res.status(404).json({ erreur: 'Ticket introuvable' });
   res.json(t);
 });
 router.patch('/tickets/:id', (req, res) => {
@@ -198,7 +176,6 @@ router.patch('/tickets/:id', (req, res) => {
     data.assignee_id = intOuNull(body.assignee_id);
     if (data.assignee_id && !personneExiste(data.assignee_id)) return res.status(400).json({ erreur: 'Personne assignée inconnue.' });
   }
-  // Statut : doit appartenir au workflow du projet (sinon le ticket sortirait de toute colonne du board).
   if (body.statut !== undefined) {
     const pid = ticketProjet(id);
     if (pid === null) return res.status(404).json({ erreur: 'Ticket introuvable' });
@@ -223,12 +200,11 @@ router.post('/tickets/:id/commentaires', (req, res) => {
 });
 
 // --- Notifications & tableau de bord --------------------------------------
+// On ne lit/modifie QUE ses propres notifications (id = l'utilisateur connecté).
 router.get('/personnes/:id/notifications', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
-  // On ne lit QUE ses propres notifications (l'opérateur déclaré doit être la personne :id).
-  const moi = personneDuBadge(req.operateur);
-  if (!moi || moi.id !== id) return res.status(403).json({ erreur: 'Accès refusé' });
+  if (req.user.id !== id) return res.status(403).json({ erreur: 'Accès refusé' });
   res.json(listerNotifications(id));
 });
 router.patch('/notifications/:id', (req, res) => {
@@ -236,10 +212,9 @@ router.patch('/notifications/:id', (req, res) => {
   if (id === null) return;
   const owner = notifProprietaire(id);
   if (owner === null) return res.status(404).json({ erreur: 'Notification introuvable' });
-  const moi = personneDuBadge(req.operateur);
-  if (!moi || moi.id !== owner) return res.status(403).json({ erreur: 'Accès refusé' });
+  if (req.user.id !== owner) return res.status(403).json({ erreur: 'Accès refusé' });
   return marquerNotifLue(id) ? res.json({ ok: true }) : res.status(404).json({ erreur: 'Notification introuvable' });
 });
-router.get('/stats', (req, res) => res.json(statistiques(req.operateur)));
+router.get('/stats', (req, res) => res.json(statistiques(req.user.id)));
 
 export default router;

@@ -1,13 +1,9 @@
 /**
  * Capture visuelle du portail (vérification UI hors-modèle, SANS dépendance npm).
- *
- * Pilote Edge en headless via le protocole CDP (WebSocket global de Node ≥ 22) :
- *   1) démarre un serveur éphémère + SQLite jetable ;
- *   2) seede un jeu de données ticketing (personne, projet, tickets multi-statuts) ;
- *   3) pré-règle l'opérateur (localStorage) pour passer le gate d'identité ;
- *   4) navigue, attend le rendu, capture des PNG + remonte les erreurs console.
- *
- * Lancement : node tools/ui-capture.mjs   → PNG dans tools/captures/, exit 0 si rendu OK.
+ * Pilote Edge headless via CDP (WebSocket natif de Node ≥ 22).
+ *   1) serveur éphémère + SQLite jetable ; 2) seed authentifié (admin → comptes,
+ *   projet, tickets) ; 3) capture l'écran de login, puis se connecte et capture
+ *   le board, la page comptes (admin) et l'accueil. PNG dans tools/captures/.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -24,6 +20,7 @@ const PORT = 3998;
 const DBG = 9223;
 const BASE = `http://127.0.0.1:${PORT}`;
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const ADMIN = { email: 'admin@amitel.fr', password: 'admin-cap-123' };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const dbDir = mkdtempSync(join(tmpdir(), 'portail-ui-'));
@@ -42,7 +39,6 @@ function envoyer(method, params = {}, sessionId) {
     setTimeout(() => enAttente.has(id) && (enAttente.delete(id), rej(new Error('CDP timeout ' + method))), 15000);
   });
 }
-
 async function attendrePret(url, capMs = 15000) {
   const t0 = Date.now();
   while (Date.now() - t0 < capMs) {
@@ -52,40 +48,37 @@ async function attendrePret(url, capMs = 15000) {
   throw new Error('pas prêt: ' + url);
 }
 
+// --- Seed authentifié (côté serveur, cookie admin) -------------------------
 async function seed() {
-  const op = { 'Content-Type': 'application/json', 'X-Operateur': 'Smoke A.' };
-  const post = (u, b) => fetch(BASE + u, { method: 'POST', headers: op, body: JSON.stringify(b) }).then((r) => r.json());
-  const p1 = await post('/api/ticketing/personnes', { nom: 'Smoke Agent', email: 'smoke@amitel.fr' });
-  const p2 = await post('/api/ticketing/personnes', { nom: 'Marie Curie', email: 'marie@amitel.fr' });
-  const proj = await post('/api/ticketing/projets', { cle: 'IT', nom: 'Support informatique', couleur: '#2980B9', membres: [p1.id] });
-  const t1 = await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Écran de Paul HS', type: 'incident', priorite: 'haute', assignee_id: p1.id });
-  const t2 = await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Créer compte AD nouvelle recrue', type: 'demande', priorite: 'normale', assignee_id: p2.id });
+  const cookieJar = (r) => { const sc = r.headers.get('set-cookie') || ''; const m = sc.match(/sid=([^;]+)/); return m ? `sid=${m[1]}` : ''; };
+  const lr = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: ADMIN.email, password: ADMIN.password }) });
+  const cookie = cookieJar(lr);
+  const post = (u, b) => fetch(BASE + u, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(b) }).then((r) => r.json());
+  const patch = (u, b) => fetch(BASE + u, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(b) });
+  const u1 = await post('/api/auth/users', { nom: 'Paul Martin', email: 'paul@amitel.fr', motDePasse: 'motdepasse', service: 'Développement', role: 'membre' });
+  const u2 = await post('/api/auth/users', { nom: 'Marie Curie', email: 'marie@amitel.fr', motDePasse: 'motdepasse', service: 'Support', role: 'membre' });
+  const proj = await post('/api/ticketing/projets', { cle: 'IT', nom: 'Support informatique', couleur: '#2980B9', membres: [u1.id, u2.id] });
+  const t1 = await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Écran de Paul HS', type: 'incident', priorite: 'haute', assignee_id: u1.id });
+  const t2 = await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Créer compte AD recrue', type: 'demande', priorite: 'normale', assignee_id: u2.id });
   await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Mettre à jour la doc VPN', type: 'tache', priorite: 'basse' });
-  // disperse les statuts pour un board parlant
-  const patch = (id, b) => fetch(`${BASE}/api/ticketing/tickets/${id}`, { method: 'PATCH', headers: op, body: JSON.stringify(b) });
-  await patch(t1.id, { statut: 'en_cours' });
-  await patch(t2.id, { statut: 'en_attente' });
-  // un 2e projet pour l'accueil
-  await post('/api/ticketing/projets', { cle: 'RH', nom: 'Ressources humaines', couleur: '#8E44AD', prive: true, membres: [p1.id] });
+  await patch(`/api/ticketing/tickets/${t1.id}`, { statut: 'en_cours' });
+  await patch(`/api/ticketing/tickets/${t2.id}`, { statut: 'en_attente' });
   return proj.id;
 }
 
-async function capturer(session, hash, nom) {
+async function capturer(session, hash, nom, selecteur) {
   await envoyer('Page.navigate', { url: BASE + '/' + hash }, session);
-  // attend le rendu réel (élément présent), pas un délai fixe
   const t0 = Date.now();
   let pret = false;
   while (Date.now() - t0 < 8000) {
-    const sel = hash.includes('/p/') ? '.tk-board' : hash.includes('/t/') ? '.tk-detail' : '.grille, .vide';
-    const r = await envoyer('Runtime.evaluate', { expression: `!!document.querySelector('${sel}')`, returnByValue: true }, session);
+    const r = await envoyer('Runtime.evaluate', { expression: `!!document.querySelector('${selecteur}')`, returnByValue: true }, session);
     if (r.result?.value) { pret = true; break; }
     await wait(150);
   }
-  await wait(250);
+  await wait(300);
   const shot = await envoyer('Page.captureScreenshot', { format: 'png' }, session);
-  const chemin = join(OUT, nom + '.png');
-  writeFileSync(chemin, Buffer.from(shot.data, 'base64'));
-  console.log(`  capture: ${chemin} (rendu=${pret})`);
+  writeFileSync(join(OUT, nom + '.png'), Buffer.from(shot.data, 'base64'));
+  console.log(`  capture: ${nom}.png (rendu=${pret})`);
   return pret;
 }
 
@@ -99,7 +92,7 @@ function nettoyer() {
 
 try {
   serveur = spawn(process.execPath, [join(ROOT, 'server', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', PORTAIL_DB: join(dbDir, 'ui.db') }, stdio: 'pipe',
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', PORTAIL_DB: join(dbDir, 'ui.db'), ADMIN_EMAIL: ADMIN.email, ADMIN_PASSWORD: ADMIN.password }, stdio: 'pipe',
   });
   await attendrePret(`${BASE}/`);
   const projId = await seed();
@@ -109,7 +102,6 @@ try {
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     `--remote-debugging-port=${DBG}`, `--user-data-dir=${profil}`, '--window-size=1440,900', 'about:blank',
   ], { stdio: 'ignore' });
-
   const ver = await attendrePret(`http://127.0.0.1:${DBG}/json/version`);
   ws = new WebSocket(ver.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
@@ -131,20 +123,48 @@ try {
   await envoyer('Page.enable', {}, session);
   await envoyer('Runtime.enable', {}, session);
 
-  // passe le gate d'identité : pré-règle l'opérateur dans localStorage de l'origine
-  await envoyer('Page.navigate', { url: `${BASE}/` }, session);
-  await wait(500);
-  await envoyer('Runtime.evaluate', {
-    expression: `localStorage.setItem('portail.operateur', JSON.stringify({prenom:'Smoke',nom:'Agent'}))`,
-  }, session);
+  // Capture par CHANGEMENT DE HASH (sans reload) — garde la session SPA vivante après login.
+  async function capturerHash(hash, nom, selecteur) {
+    await envoyer('Runtime.evaluate', { expression: `location.hash=${JSON.stringify(hash)}`, returnByValue: true }, session);
+    const t0 = Date.now();
+    let pret = false;
+    while (Date.now() - t0 < 8000) {
+      const r = await envoyer('Runtime.evaluate', { expression: `!!document.querySelector('${selecteur}')`, returnByValue: true }, session);
+      if (r.result?.value) { pret = true; break; }
+      await wait(150);
+    }
+    await wait(300);
+    const shot = await envoyer('Page.captureScreenshot', { format: 'png' }, session);
+    writeFileSync(join(OUT, nom + '.png'), Buffer.from(shot.data, 'base64'));
+    console.log(`  capture: ${nom}.png (rendu=${pret})`);
+    return pret;
+  }
 
-  const okAccueil = await capturer(session, '#/ticketing/', 'ticketing-accueil');
-  const okBoard = await capturer(session, `#/ticketing/p/${projId}`, 'ticketing-board');
-  const okDetail = await capturer(session, '#/ticketing/t/1', 'ticketing-detail');
+  // 1) Écran de login (aucune session)
+  const okLogin = await capturer(session, '', 'login', '.gate');
+
+  // 2) Connexion via le VRAI formulaire (remplit + soumet) → session SPA vivante
+  await envoyer('Runtime.evaluate', {
+    expression: `(()=>{const e=document.getElementById('login-email'),p=document.getElementById('login-mdp');if(!e||!p)return 'no-form';e.value=${JSON.stringify(ADMIN.email)};p.value=${JSON.stringify(ADMIN.password)};document.getElementById('login-form').requestSubmit();return 'ok';})()`,
+    returnByValue: true,
+  }, session);
+  // attend la connexion effective (le badge opérateur apparaît dans l'en-tête)
+  let connecte = false;
+  for (let i = 0; i < 40; i++) {
+    const r = await envoyer('Runtime.evaluate', { expression: `!!document.querySelector('.op-badge')`, returnByValue: true }, session);
+    if (r.result?.value) { connecte = true; break; }
+    await wait(150);
+  }
+  if (!connecte) erreurs.push('connexion UI : badge opérateur non apparu après soumission du formulaire');
+
+  // 3) Vues connectées (navigation par hash, sans reload)
+  const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board');
+  const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
+  const okAccueil = await capturerHash('#/', 'accueil', '.grille-sections, .grille, .vide');
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okAccueil && okBoard && okDetail && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okAccueil && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);

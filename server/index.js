@@ -10,6 +10,10 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+// Auth CORE importée AVANT les sections : crée les tables users/sessions + amorce l'admin,
+// pour que le ticketing puisse référencer users(id) dès sa propre création de tables.
+import { middlewareSession, exigerAuth, amorcerAdmin } from './core/auth.js';
+import authRoutes from './core/auth-routes.js';
 import { enregistrerSections } from './sections/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,33 +36,25 @@ app.use((_req, res, next) => {
 // Le payload légitime est minuscule : on plafonne bas pour limiter l'abus.
 app.use(express.json({ limit: '32kb' }));
 
-// --- Point d'ancrage AUTH (inactif) ---------------------------------------
-// L'auth n'est pas encore branchée (réseau interne de confiance). Quand une
-// section sensible l'exigera, brancher ici un middleware qui peuple req.user,
-// puis protéger les sections concernées dans leur register(). Laisser passer
-// pour l'instant.
-app.use((req, _res, next) => {
-  req.user = null; // aucun utilisateur authentifié pour le moment
-  next();
-});
+// --- AUTH : session vérifiée côté serveur ---------------------------------
+// Peuple req.user (compte authentifié, ou null) + req.operateur (badge dérivé, qui
+// signe les actions — désormais issu de la session VÉRIFIÉE, plus d'un en-tête falsifiable).
+app.use(middlewareSession);
 
-// --- Signature opérateur (identification DÉCLARATIVE, pas une auth) --------
-// Le client transmet le badge « Prénom N. » via l'en-tête X-Operateur (encodé).
-// Sert à attribuer/signer les actions ; NON vérifié (réseau interne de confiance).
-app.use((req, _res, next) => {
-  const brut = req.get('X-Operateur') || '';
-  let badge = '';
-  try {
-    badge = decodeURIComponent(brut);
-  } catch {
-    badge = brut; // en-tête malformé : on garde le brut plutôt que d'échouer
-  }
-  req.operateur = badge.trim().slice(0, 120);
-  next();
-});
+// Routes d'auth (login/logout/me + admin comptes) : EXEMPTES de la garde (login doit
+// être joignable sans session). Montées avant la garde globale.
+app.use('/api/auth', authRoutes);
 
-// --- Sections du portail (montées dynamiquement) --------------------------
+// Garde : toute autre route /api exige une session valide → 401 sinon (anti-usurpation).
+// Les statiques + le shell SPA restent publics (le front affiche l'écran de login).
+app.use('/api', exigerAuth);
+
+// --- Sections du portail (montées dynamiquement, derrière la garde) -------
 enregistrerSections(app);
+
+// Amorçage de l'admin APRÈS les sections : la migration tk_people->users (dans la couche
+// ticketing) a déjà tourné -> l'admin reçoit un id postérieur aux personnes migrées (zéro collision).
+amorcerAdmin();
 
 // --- Fichiers statiques (SPA) ---------------------------------------------
 app.use(express.static(join(__dirname, '..', 'public')));

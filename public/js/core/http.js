@@ -1,19 +1,18 @@
 /** Wrapper fetch générique du portail (partagé par toutes les sections). */
 
-import { badgeOperateur } from './identite.js';
-
 export async function requete(url, options = {}) {
-  // Signature de l'opérateur courant : en-tête X-Operateur (badge « Prénom N. »,
-  // encodé pour rester ASCII). Le serveur l'attribue aux actions.
-  const badge = badgeOperateur();
+  // L'identité vient de la SESSION (cookie HttpOnly) : credentials:'include' l'envoie.
+  // Plus d'en-tête falsifiable ; le serveur attribue les actions au compte connecté.
   const reponse = await fetch(url, {
+    credentials: 'include',
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(badge ? { 'X-Operateur': encodeURIComponent(badge) } : {}),
-      ...(options.headers || {}),
-    },
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
+  // Session absente/expirée : on signale au shell de réafficher l'écran de connexion.
+  if (reponse.status === 401) {
+    window.dispatchEvent(new CustomEvent('portail:401'));
+    throw new Error('Session expirée — reconnectez-vous.');
+  }
   if (!reponse.ok) {
     let message = `Erreur ${reponse.status}`;
     try {

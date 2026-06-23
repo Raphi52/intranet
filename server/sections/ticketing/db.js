@@ -1,10 +1,12 @@
 /**
  * Section TICKETING — couche d'accès aux données.
  *
- * Possède SES tables sur la connexion partagée du portail (`core/db.js`).
- * Modèle MULTI-PROJETS : tout ticket appartient à un projet ; chaque projet a
- * son workflow (statuts), ses membres, et un drapeau « privé ». L'identité reste
- * déclarative (badge « Prénom N. ») → assignation / appartenance = honor-system.
+ * Modèle MULTI-PROJETS. Depuis l'ajout de l'AUTH, le registre des personnes EST
+ * la table `users` (créée par `core/auth.js`) : un membre / un assigné = un compte.
+ * La confidentialité des projets privés est désormais RÉELLEMENT appliquée par
+ * `id` utilisateur (l'identité est vérifiée côté serveur), plus un honor-system.
+ * Les signatures (created_par/auteur/demandeur) restent des chaînes « Prénom N. »
+ * issues de la session VÉRIFIÉE (req.operateur dérivé de req.user).
  */
 
 import db from '../../core/db.js';
@@ -18,15 +20,9 @@ import {
 } from './template.js';
 
 // --- Schéma (idempotent) --------------------------------------------------
+// NB : pas de table `tk_people` — les personnes vivent dans `users` (auth core).
+// Les FK assignee_id / person_id pointent vers users(id).
 db.exec(`
-  CREATE TABLE IF NOT EXISTS tk_people (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    nom        TEXT NOT NULL DEFAULT '',
-    email      TEXT NOT NULL DEFAULT '',
-    actif      INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
   CREATE TABLE IF NOT EXISTS tk_projects (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     cle         TEXT NOT NULL UNIQUE,
@@ -43,7 +39,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS tk_project_members (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES tk_projects(id) ON DELETE CASCADE,
-    person_id  INTEGER NOT NULL REFERENCES tk_people(id) ON DELETE CASCADE,
+    person_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role       TEXT NOT NULL DEFAULT '${ROLE_DEFAUT}',
     UNIQUE(project_id, person_id)
   );
@@ -67,7 +63,7 @@ db.exec(`
     type         TEXT NOT NULL DEFAULT '${TYPE_DEFAUT}',
     priorite     TEXT NOT NULL DEFAULT '${PRIORITE_DEFAUT}',
     statut       TEXT NOT NULL DEFAULT 'a_faire',
-    assignee_id  INTEGER REFERENCES tk_people(id) ON DELETE SET NULL,
+    assignee_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     demandeur    TEXT NOT NULL DEFAULT '',
     echeance     TEXT NOT NULL DEFAULT '',
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
@@ -108,7 +104,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS tk_notifications (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    person_id  INTEGER NOT NULL REFERENCES tk_people(id) ON DELETE CASCADE,
+    person_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ticket_id  INTEGER REFERENCES tk_tickets(id) ON DELETE CASCADE,
     type       TEXT NOT NULL DEFAULT '',
     message    TEXT NOT NULL DEFAULT '',
@@ -125,31 +121,91 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tk_notifs_person ON tk_notifications(person_id);
 `);
 
-// Acteur normalisé (badge « Prénom N. »), plafonné. '' si non identifié.
+// --- Migration (idempotente) : ancien registre tk_people -> users ----------
+// Sur une base d'avant l'auth, tk_people existe et les FK pointent dessus. On
+// recopie les personnes dans users (ids PRÉSERVÉS) puis on reconstruit les tables
+// FK vers users(id) et on supprime tk_people. Fresh DB (smoke) : pas de tk_people -> no-op.
+migrerTkPeopleVersUsers();
+function migrerTkPeopleVersUsers() {
+  const existe = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='tk_people'`).get();
+  if (!existe) return;
+  const people = db.prepare(`SELECT * FROM tk_people`).all();
+  const insUser = db.prepare(
+    `INSERT OR IGNORE INTO users (id, nom, email, service, role, actif, must_change) VALUES (?,?,?,?,?,?,1)`,
+  );
+  for (const p of people) {
+    const email = p.email && String(p.email).trim() ? String(p.email).trim() : `migre+${p.id}@local`;
+    insUser.run(p.id, p.nom || '', email, '', 'membre', p.actif ?? 1);
+  }
+  // PRAGMA foreign_keys ne peut pas changer DANS une transaction -> on l'encadre.
+  db.pragma('foreign_keys = OFF');
+  const rebuild = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE tk_project_members_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL REFERENCES tk_projects(id) ON DELETE CASCADE,
+        person_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'membre',
+        UNIQUE(project_id, person_id)
+      );
+      INSERT INTO tk_project_members_new (id, project_id, person_id, role)
+        SELECT id, project_id, person_id, role FROM tk_project_members;
+      DROP TABLE tk_project_members;
+      ALTER TABLE tk_project_members_new RENAME TO tk_project_members;
+
+      CREATE TABLE tk_tickets_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL REFERENCES tk_projects(id) ON DELETE CASCADE,
+        numero INTEGER NOT NULL,
+        titre TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL DEFAULT '${TYPE_DEFAUT}', priorite TEXT NOT NULL DEFAULT '${PRIORITE_DEFAUT}',
+        statut TEXT NOT NULL DEFAULT 'a_faire',
+        assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        demandeur TEXT NOT NULL DEFAULT '', echeance TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_par TEXT NOT NULL DEFAULT '', updated_par TEXT NOT NULL DEFAULT '',
+        UNIQUE(project_id, numero)
+      );
+      INSERT INTO tk_tickets_new (id, project_id, numero, titre, description, type, priorite, statut, assignee_id, demandeur, echeance, created_at, updated_at, created_par, updated_par)
+        SELECT id, project_id, numero, titre, description, type, priorite, statut, assignee_id, demandeur, echeance, created_at, updated_at, created_par, updated_par FROM tk_tickets;
+      DROP TABLE tk_tickets;
+      ALTER TABLE tk_tickets_new RENAME TO tk_tickets;
+
+      CREATE TABLE tk_notifications_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        person_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ticket_id INTEGER REFERENCES tk_tickets(id) ON DELETE CASCADE,
+        type TEXT NOT NULL DEFAULT '', message TEXT NOT NULL DEFAULT '',
+        lu INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO tk_notifications_new (id, person_id, ticket_id, type, message, lu, created_at)
+        SELECT id, person_id, ticket_id, type, message, lu, created_at FROM tk_notifications;
+      DROP TABLE tk_notifications;
+      ALTER TABLE tk_notifications_new RENAME TO tk_notifications;
+
+      DROP TABLE tk_people;
+
+      CREATE INDEX IF NOT EXISTS idx_tk_tickets_project ON tk_tickets(project_id);
+      CREATE INDEX IF NOT EXISTS idx_tk_tickets_assignee ON tk_tickets(assignee_id);
+      CREATE INDEX IF NOT EXISTS idx_tk_members_project ON tk_project_members(project_id);
+      CREATE INDEX IF NOT EXISTS idx_tk_notifs_person ON tk_notifications(person_id);
+    `);
+  });
+  rebuild();
+  db.pragma('foreign_keys = ON');
+}
+
+// Acteur normalisé (badge « Prénom N. » issu de la session VÉRIFIÉE), plafonné.
 const acteurNet = (a) => (a ?? '').toString().trim().slice(0, 120);
 const txt = (v, max = 2000) => String(v ?? '').slice(0, max);
 
-// Badge « Prénom N. » dérivé d'un NOM COMPLET (miroir de badgeNom côté front).
-// L'opérateur déclaratif n'envoie QUE son badge (X-Operateur, « Prénom N. ») ; pour
-// le matcher à un membre du registre (qui stocke un nom complet) on dérive le même badge.
-function badgeDeNom(nom) {
-  const parts = String(nom ?? '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '';
-  const dernier = parts.length > 1 ? parts[parts.length - 1] : '';
-  return dernier ? `${parts[0]} ${dernier[0].toUpperCase()}.` : parts[0];
-}
-
 // ==========================================================================
-// PERSONNES (registre — nom + e-mail, socle de l'assignation et des notifs)
+// PERSONNES = comptes `users` (lecture seule ici ; la gestion vit dans auth/admin)
 // ==========================================================================
 const stmts = {
-  insertPerson: db.prepare(`INSERT INTO tk_people (nom, email) VALUES (@nom, @email)`),
-  getPerson: db.prepare(`SELECT * FROM tk_people WHERE id = ?`),
-  listPeople: db.prepare(`SELECT * FROM tk_people ORDER BY actif DESC, nom`),
-  updatePerson: db.prepare(
-    `UPDATE tk_people SET nom=@nom, email=@email, actif=@actif WHERE id=@id`,
-  ),
-  deletePerson: db.prepare(`DELETE FROM tk_people WHERE id = ?`),
+  // Personnes : projection sur users (le registre fusionné).
+  getPerson: db.prepare(`SELECT id, nom, email, actif FROM users WHERE id = ?`),
+  listPeople: db.prepare(`SELECT id, nom, email, actif FROM users WHERE actif = 1 ORDER BY nom`),
 
   insertProject: db.prepare(`
     INSERT INTO tk_projects (cle, nom, couleur, description, prive, created_par)
@@ -177,7 +233,7 @@ const stmts = {
   `),
   membersOf: db.prepare(`
     SELECT m.id, m.role, m.person_id, p.nom, p.email
-    FROM tk_project_members m JOIN tk_people p ON p.id = m.person_id
+    FROM tk_project_members m JOIN users p ON p.id = m.person_id
     WHERE m.project_id = ? ORDER BY p.nom
   `),
   deleteMember: db.prepare(`DELETE FROM tk_project_members WHERE project_id = ? AND person_id = ?`),
@@ -210,36 +266,21 @@ const stmts = {
   getNotifOwner: db.prepare(`SELECT person_id FROM tk_notifications WHERE id = ?`),
 };
 
-// --- Personnes -------------------------------------------------------------
-export function creerPersonne({ nom, email }) {
-  const info = stmts.insertPerson.run({ nom: txt(nom, 120), email: txt(email, 200) });
-  return stmts.getPerson.get(info.lastInsertRowid);
-}
+// --- Personnes (lecture du registre = users) -------------------------------
 export function listerPersonnes() {
   return stmts.listPeople.all().map((p) => ({ ...p, actif: !!p.actif }));
 }
-export function majPersonne(id, { nom, email, actif }) {
-  const p = stmts.getPerson.get(id);
-  if (!p) return null;
-  stmts.updatePerson.run({
-    id,
-    nom: nom === undefined ? p.nom : txt(nom, 120),
-    email: email === undefined ? p.email : txt(email, 200),
-    actif: actif === undefined ? p.actif : actif ? 1 : 0,
-  });
-  const row = stmts.getPerson.get(id);
-  return { ...row, actif: !!row.actif };
-}
-export function supprimerPersonne(id) {
-  return stmts.deletePerson.run(id).changes > 0;
+/** Le compte existe-t-il (et donc assignable) ? */
+export function personneExiste(id) {
+  return Number.isInteger(id) && !!stmts.getPerson.get(id);
 }
 
 // ==========================================================================
-// PROJETS (+ statuts seedés, membres, privé honor-system)
+// PROJETS (+ statuts seedés, membres, privé RÉELLEMENT appliqué par id user)
 // ==========================================================================
 
-/** Crée un projet, seede son workflow par défaut, l'ajoute à ses membres si demandé. */
-export const creerProjet = db.transaction((data, acteur = '') => {
+/** Crée un projet, seede son workflow par défaut, ajoute ses membres (ids users) + le créateur. */
+export const creerProjet = db.transaction((data, acteur = '', createurId = null) => {
   const info = stmts.insertProject.run({
     cle: txt(data.cle, 12).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'PROJ',
     nom: txt(data.nom, 120),
@@ -252,22 +293,26 @@ export const creerProjet = db.transaction((data, acteur = '') => {
   STATUTS_DEFAUT.forEach((s) =>
     stmts.insertStatus.run({ project_id: id, cle: s.cle, label: s.label, ordre: s.ordre, terminal: s.terminal }),
   );
-  // Membres initiaux (ids du registre), si fournis.
-  for (const pid of data.membres || []) {
-    if (Number.isInteger(pid)) stmts.insertMember.run({ project_id: id, person_id: pid, role: 'admin' });
+  // Le CRÉATEUR est membre (admin) de son projet — sinon il ne pourrait pas accéder à un projet privé qu'il vient de créer.
+  const membres = new Set(data.membres || []);
+  if (Number.isInteger(createurId)) membres.add(createurId);
+  for (const pid of membres) {
+    if (Number.isInteger(pid) && stmts.getPerson.get(pid)) {
+      // Le créateur est admin du projet ; les autres membres initiaux ont le rôle par défaut.
+      stmts.insertMember.run({ project_id: id, person_id: pid, role: pid === createurId ? 'admin' : ROLE_DEFAUT });
+    }
   }
   return id;
 });
 
 function projetComplet(p) {
   if (!p) return null;
-  const membres = stmts.membersOf.all(p.id);
   return {
     ...p,
     prive: !!p.prive,
     archive: !!p.archive,
     statuts: stmts.statusesOf.all(p.id).map((s) => ({ ...s, terminal: !!s.terminal })),
-    membres,
+    membres: stmts.membersOf.all(p.id),
   };
 }
 
@@ -275,20 +320,21 @@ export function getProjet(id) {
   return projetComplet(stmts.getProject.get(id));
 }
 
+/** Ids des membres d'un projet (pour les contrôles de visibilité). */
+function membreIds(projectId) {
+  return stmts.membersOf.all(projectId).map((m) => m.person_id);
+}
+
 /**
- * Liste les projets visibles par `operateur` (badge déclaratif). Un projet PRIVÉ
- * n'est listé que si l'opérateur correspond (insensible casse) au nom d'un membre
- * — barrière douce honor-system (pas un vrai contrôle d'accès, cf. cadrage).
+ * Liste les projets visibles par l'utilisateur `userId` (session vérifiée).
+ * Un projet PRIVÉ n'est visible que si l'utilisateur en est MEMBRE (id réel) —
+ * vrai contrôle d'accès (l'identité est vérifiée), plus un honor-system.
  */
-export function listerProjets(operateur = '') {
-  const op = acteurNet(operateur).toLowerCase();
+export function listerProjets(userId = null) {
   return stmts.listProjects
     .all()
-    .map((p) => {
-      const membres = stmts.membersOf.all(p.id);
-      return { ...p, prive: !!p.prive, archive: !!p.archive, membres };
-    })
-    .filter((p) => !p.prive || (op && p.membres.some((m) => badgeDeNom(m.nom).toLowerCase() === op)));
+    .map((p) => ({ ...p, prive: !!p.prive, archive: !!p.archive, membres: stmts.membersOf.all(p.id) }))
+    .filter((p) => !p.prive || (Number.isInteger(userId) && p.membres.some((m) => m.person_id === userId)));
 }
 
 export function majProjet(id, data) {
@@ -325,7 +371,6 @@ export function retirerMembre(projectId, personId) {
 
 const CHAMPS_SUIVIS = ['titre', 'description', 'type', 'priorite', 'statut', 'assignee_id', 'echeance'];
 
-// Échéance projetée depuis le SLA de la priorité (si non fournie explicitement).
 function echeanceParSla(priorite) {
   const h = SLA_HEURES[priorite];
   if (!h) return '';
@@ -350,14 +395,13 @@ export const creerTicket = db.transaction((projectId, data, acteur = '') => {
     type: data.type || TYPE_DEFAUT,
     priorite,
     statut: data.statut || statutDefaut,
-    assignee_id: Number.isInteger(data.assignee_id) ? data.assignee_id : null,
+    assignee_id: Number.isInteger(data.assignee_id) && data.assignee_id > 0 ? data.assignee_id : null,
     demandeur: acteurNet(data.demandeur || acteur),
     echeance: data.echeance ? txt(data.echeance, 30) : echeanceParSla(priorite),
     created_par: acteurNet(acteur),
   });
   const ticketId = info.lastInsertRowid;
-  // Assignation dès la création -> notif in-app au nouvel assigné (l'historique part de cet état).
-  if (Number.isInteger(data.assignee_id)) {
+  if (Number.isInteger(data.assignee_id) && data.assignee_id > 0) {
     stmts.insertNotif.run({ person_id: data.assignee_id, ticket_id: ticketId, type: 'assignation', message: `Ticket assigné : ${txt(data.titre, 300)}` });
   }
   return ticketId;
@@ -396,10 +440,10 @@ export function getTicket(id) {
 
 /**
  * Liste filtrée. `filtres` : { project_id, statut, priorite, type, assignee_id, q, retard }.
- * `operateur` applique le filtre de confidentialité (projets privés).
+ * `userId` applique le filtre de confidentialité (projets privés visibles aux membres).
  */
-export function listerTickets(filtres = {}, operateur = '') {
-  const projetsVisibles = new Set(listerProjets(operateur).map((p) => p.id));
+export function listerTickets(filtres = {}, userId = null) {
+  const projetsVisibles = new Set(listerProjets(userId).map((p) => p.id));
   const where = [];
   const params = {};
   if (Number.isInteger(filtres.project_id)) { where.push('project_id = @project_id'); params.project_id = filtres.project_id; }
@@ -425,21 +469,16 @@ export const majTicket = db.transaction((id, data, acteur = '') => {
   for (const champ of CHAMPS_SUIVIS) {
     if (data[champ] === undefined) continue;
     let val = data[champ];
-    if (champ === 'assignee_id') val = Number.isInteger(val) ? val : null;
+    if (champ === 'assignee_id') val = Number.isInteger(val) && val > 0 ? val : null;
     else val = txt(val, champ === 'description' ? 20000 : 300);
     const ancienne = t[champ];
     if (String(ancienne ?? '') === String(val ?? '')) continue;
     set.push(`${champ} = @${champ}`);
     params[champ] = val;
     stmts.insertHistory.run({
-      ticket_id: id,
-      champ,
-      ancienne: String(ancienne ?? ''),
-      nouvelle: String(val ?? ''),
-      auteur: a,
+      ticket_id: id, champ, ancienne: String(ancienne ?? ''), nouvelle: String(val ?? ''), auteur: a,
     });
-    // Notif in-app : (ré)assignation -> notifie le nouvel assigné du registre.
-    if (champ === 'assignee_id' && Number.isInteger(val)) {
+    if (champ === 'assignee_id' && Number.isInteger(val) && val > 0) {
       stmts.insertNotif.run({ person_id: val, ticket_id: id, type: 'assignation', message: `Ticket assigné : ${t.titre}` });
     }
   }
@@ -455,7 +494,6 @@ export function commenter(ticketId, corps, acteur = '') {
   if (!t) return null;
   stmts.insertComment.run({ ticket_id: ticketId, corps: txt(corps, 20000), auteur: acteurNet(acteur) });
   stmts.touchTicket.run(acteurNet(acteur), ticketId);
-  // Notif in-app à l'assigné (collaboration : l'assigné est prévenu d'un nouveau commentaire).
   if (t.assignee_id) {
     stmts.insertNotif.run({ person_id: t.assignee_id, ticket_id: ticketId, type: 'commentaire', message: `Nouveau commentaire : ${t.titre}` });
   }
@@ -473,27 +511,19 @@ export function listerNotifications(personId) {
 export function marquerNotifLue(id) {
   return stmts.markNotifRead.run(id).changes > 0;
 }
-/** Propriétaire (person_id) d'une notification, ou null. */
+/** Propriétaire (user id) d'une notification, ou null. */
 export function notifProprietaire(id) {
   const n = stmts.getNotifOwner.get(id);
   return n ? n.person_id : null;
 }
 
-// --- Visibilité / identité (honor-system, ACCÈS UNITAIRE) ------------------
-// Le filtre de liste (listerProjets) ne suffit pas : l'accès direct par id doit AUSSI vérifier.
-/** Un projet est-il visible par l'opérateur ? (public, ou opérateur = membre via badge). */
-export function projetVisiblePour(projectId, operateur) {
+// --- Visibilité (ACCÈS UNITAIRE, par id utilisateur vérifié) ----------------
+/** Un projet est-il visible par l'utilisateur ? (public, ou membre par id réel). */
+export function projetVisiblePour(projectId, userId) {
   const p = stmts.getProject.get(projectId);
   if (!p) return false;
   if (!p.prive) return true;
-  const op = acteurNet(operateur).toLowerCase();
-  return !!op && stmts.membersOf.all(projectId).some((m) => badgeDeNom(m.nom).toLowerCase() === op);
-}
-/** Personne du registre correspondant au badge déclaratif de l'opérateur, ou null. */
-export function personneDuBadge(operateur) {
-  const op = acteurNet(operateur).toLowerCase();
-  if (!op) return null;
-  return stmts.listPeople.all().find((p) => badgeDeNom(p.nom).toLowerCase() === op) || null;
+  return Number.isInteger(userId) && membreIds(projectId).includes(userId);
 }
 /** Le statut `cle` fait-il partie du workflow du projet ? */
 export function statutValide(projectId, cle) {
@@ -504,14 +534,10 @@ export function ticketProjet(id) {
   const t = stmts.getTicket.get(id);
   return t ? t.project_id : null;
 }
-/** La personne du registre existe-t-elle ? */
-export function personneExiste(id) {
-  return Number.isInteger(id) && !!stmts.getPerson.get(id);
-}
 
 // --- Tableau de bord (agrégats) -------------------------------------------
-export function statistiques(operateur = '') {
-  const projetsVisibles = new Set(listerProjets(operateur).map((p) => p.id));
+export function statistiques(userId = null) {
+  const projetsVisibles = new Set(listerProjets(userId).map((p) => p.id));
   const tickets = db.prepare(`SELECT * FROM tk_tickets`).all().filter((t) => projetsVisibles.has(t.project_id)).map((t) => decorer(t));
   const parStatut = {};
   let enRetard = 0;
