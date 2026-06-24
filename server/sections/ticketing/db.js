@@ -195,6 +195,14 @@ function migrerTkPeopleVersUsers() {
   db.pragma('foreign_keys = ON');
 }
 
+// Colonne created_par_id (id de l'auteur du ticket) : sous-tend la garde « seul le créateur
+// édite ses champs + son assignation ». Ajout idempotent (created_par reste le badge d'affichage).
+try {
+  db.exec('ALTER TABLE tk_tickets ADD COLUMN created_par_id INTEGER');
+} catch {
+  /* colonne déjà présente */
+}
+
 // Acteur normalisé (badge « Prénom N. » issu de la session VÉRIFIÉE), plafonné.
 const acteurNet = (a) => (a ?? '').toString().trim().slice(0, 120);
 const txt = (v, max = 2000) => String(v ?? '').slice(0, max);
@@ -239,8 +247,8 @@ const stmts = {
   deleteMember: db.prepare(`DELETE FROM tk_project_members WHERE project_id = ? AND person_id = ?`),
 
   insertTicket: db.prepare(`
-    INSERT INTO tk_tickets (project_id, numero, titre, description, type, priorite, statut, assignee_id, demandeur, echeance, created_par, updated_par)
-    VALUES (@project_id, @numero, @titre, @description, @type, @priorite, @statut, @assignee_id, @demandeur, @echeance, @created_par, @created_par)
+    INSERT INTO tk_tickets (project_id, numero, titre, description, type, priorite, statut, assignee_id, demandeur, echeance, created_par, updated_par, created_par_id)
+    VALUES (@project_id, @numero, @titre, @description, @type, @priorite, @statut, @assignee_id, @demandeur, @echeance, @created_par, @created_par, @created_par_id)
   `),
   getTicket: db.prepare(`SELECT * FROM tk_tickets WHERE id = ?`),
   deleteTicket: db.prepare(`DELETE FROM tk_tickets WHERE id = ?`),
@@ -379,7 +387,7 @@ function echeanceParSla(priorite) {
 }
 
 /** Crée un ticket dans un projet : numéro = séquence par projet (transactionnel). */
-export const creerTicket = db.transaction((projectId, data, acteur = '') => {
+export const creerTicket = db.transaction((projectId, data, acteur = '', creatorId = null) => {
   const projet = stmts.getProject.get(projectId);
   if (!projet) return null;
   stmts.bumpSeq.run(projectId);
@@ -399,6 +407,7 @@ export const creerTicket = db.transaction((projectId, data, acteur = '') => {
     demandeur: acteurNet(data.demandeur || acteur),
     echeance: data.echeance ? txt(data.echeance, 30) : echeanceParSla(priorite),
     created_par: acteurNet(acteur),
+    created_par_id: Number.isInteger(creatorId) && creatorId > 0 ? creatorId : null,
   });
   const ticketId = info.lastInsertRowid;
   if (Number.isInteger(data.assignee_id) && data.assignee_id > 0) {

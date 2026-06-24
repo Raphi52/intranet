@@ -146,7 +146,7 @@ router.post('/projets/:id/tickets', (req, res) => {
   const assignee_id = intOuNull(body.assignee_id);
   if (assignee_id && !personneExiste(assignee_id)) return res.status(400).json({ erreur: 'Personne assignée inconnue.' });
   try {
-    const ticketId = creerTicket(id, { ...body, assignee_id }, req.operateur);
+    const ticketId = creerTicket(id, { ...body, assignee_id }, req.operateur, req.user.id);
     if (!ticketId) return res.status(404).json({ erreur: 'Projet introuvable' });
     res.status(201).json(getTicket(ticketId));
   } catch (e) {
@@ -171,14 +171,28 @@ router.patch('/tickets/:id', (req, res) => {
   const body = req.body || {};
   if (body.priorite && !PRIORITES.includes(body.priorite)) return res.status(400).json({ erreur: 'Priorité invalide.' });
   if (body.type && !TYPES.includes(body.type)) return res.status(400).json({ erreur: 'Type invalide.' });
+  const courant = getTicket(id);
+  if (!courant) return res.status(404).json({ erreur: 'Ticket introuvable' });
+
+  // Édition des CHAMPS + de l'ASSIGNATION : réservée au créateur du ticket (ou à un admin).
+  // Le déplacement de colonne (statut) garde sa propre règle plus bas (« je prends un ticket libre »).
+  const CHAMPS_PROTEGES = ['titre', 'description', 'priorite', 'type', 'echeance', 'assignee_id'];
+  if (CHAMPS_PROTEGES.some((c) => c in body)) {
+    const estCreateur =
+      (Number.isInteger(courant.created_par_id) && courant.created_par_id === req.user.id) ||
+      // Tickets antérieurs à la colonne created_par_id : repli sur le badge d'auteur.
+      (courant.created_par_id == null && !!courant.created_par && courant.created_par === req.operateur);
+    if (!estCreateur && req.user.role !== 'admin') {
+      return res.status(403).json({ erreur: 'Seul le créateur du ticket peut modifier ses champs et son assignation.' });
+    }
+  }
+
   const data = { ...body };
   if ('assignee_id' in body) {
     data.assignee_id = intOuNull(body.assignee_id);
     if (data.assignee_id && !personneExiste(data.assignee_id)) return res.status(400).json({ erreur: 'Personne assignée inconnue.' });
   }
   if (body.statut !== undefined) {
-    const courant = getTicket(id);
-    if (!courant) return res.status(404).json({ erreur: 'Ticket introuvable' });
     if (!statutValide(courant.project_id, body.statut)) return res.status(400).json({ erreur: 'Statut invalide pour ce projet.' });
     if (body.statut !== courant.statut) {
       // Déplacement : on ne déplace QUE son propre ticket ou un ticket libre (qu'on s'attribue). Admin = exempt.

@@ -292,6 +292,22 @@ try {
     const badCouleur = await f('/api/ticketing/projets', { method: 'POST', body: { cle: 'XX', nom: 'X', couleur: 'red;url(//x)' } });
     badCouleur.status === 400 ? ok('ticketing: couleur non-hex rejetée (400)') : ko(`ticketing: couleur libre (status ${badCouleur.status})`);
 
+    // e2) Permission : seul le CRÉATEUR du ticket (ou un admin) édite ses champs + son assignation
+    const tkCreaR = await f(`/api/ticketing/projets/${proj.id}/tickets`, { method: 'POST', cookie: cAgent, body: { titre: 'Ticket de agent', priorite: 'normale' } });
+    const tkCrea = await tkCreaR.json().catch(() => null);
+    tkCreaR.status === 201 && tkCrea?.id
+      ? ok('ticket: un membre crée un ticket (en devient le créateur)')
+      : ko(`ticket: création par un membre (status ${tkCreaR.status})`);
+    const editTkAutre = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'PATCH', cookie: cAutre, body: { titre: 'pirate' } });
+    editTkAutre.status === 403 ? ok('ticket: édition de champ par un non-créateur refusée (403)') : ko(`ticket: non-créateur a édité un champ (status ${editTkAutre.status})`);
+    const reassignTkAutre = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'PATCH', cookie: cAutre, body: { assignee_id: autre.id } });
+    reassignTkAutre.status === 403 ? ok('ticket: réassignation par un non-créateur refusée (403)') : ko(`ticket: non-créateur a réassigné (status ${reassignTkAutre.status})`);
+    const editTkCrea = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'PATCH', cookie: cAgent, body: { priorite: 'haute' } });
+    const editTkCreaJ = await editTkCrea.json().catch(() => null);
+    editTkCrea.status === 200 && editTkCreaJ?.priorite === 'haute' ? ok('ticket: le créateur édite ses champs (200)') : ko(`ticket: créateur bloqué (status ${editTkCrea.status})`);
+    const editTkAdmin = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'PATCH', body: { titre: 'Corrigé par admin' } });
+    editTkAdmin.status === 200 ? ok('ticket: l\'admin édite n\'importe quel ticket (200)') : ko(`ticket: admin bloqué (status ${editTkAdmin.status})`);
+
     // f) Confidentialité RÉELLE par compte (projet privé) -------------------
     const privR = await f('/api/ticketing/projets', { method: 'POST', body: { cle: 'RH', nom: 'RH confidentiel', prive: true, membres: [agent.id] } });
     const priv = await privR.json().catch(() => null);
