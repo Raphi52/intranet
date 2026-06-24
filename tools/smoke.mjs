@@ -207,6 +207,14 @@ try {
     const bad = await f('/api/onboarding/collaborateurs', { method: 'POST', body: { prenom: 'X', service: 'PasUnService' } });
     bad.status === 400 ? ok('fix #7 : POST avec service hors liste rejeté (400)') : ko(`fix #7 : 400 attendu, reçu ${bad.status}`);
 
+    // #1 : input nom nettoyé (retours de ligne/contrôle retirés, plafonné) — ne casse pas les cards
+    const sale = await f('/api/onboarding/collaborateurs', { method: 'POST', body: { prenom: 'Inj', nom: 'A'.repeat(300) + '\nLigne2\tTab' } });
+    const saleJ = await sale.json().catch(() => null);
+    sale.status === 201 && saleJ && !/[\r\n\t]/.test(saleJ.nom) && saleJ.nom.length <= 120
+      ? ok('onboarding #1 : nom nettoyé (sans saut de ligne, plafonné ≤120)')
+      : ko(`onboarding #1 : input non nettoyé (len=${saleJ?.nom?.length}, ctrl=${/[\r\n\t]/.test(saleJ?.nom || '')})`);
+    if (saleJ?.id) await f(`/api/onboarding/collaborateurs/${saleJ.id}`, { method: 'DELETE' });
+
     const liste = await jget('/api/onboarding/collaborateurs');
     Array.isArray(liste.body) && liste.body.every((c) => c.progression && typeof c.progression.total === 'number')
       ? ok('fix #1 : GET /collaborateurs renvoie la progression agrégée')
@@ -313,6 +321,19 @@ try {
       : ko(`ticketing: FUITE mutation privée (patch=${mPatch.status} del=${mDel.status} com=${mCom.status} put=${mPut.status} membre=${mMembre.status})`);
     const memPatch = await f(`/api/ticketing/tickets/${privTk.id}`, { method: 'PATCH', cookie: cAgent, body: { statut: 'en_cours' } });
     memPatch.status === 200 ? ok('ticketing: membre peut muter son projet privé (pas de régression)') : ko(`ticketing: régression membre privé (status ${memPatch.status})`);
+
+    // #3 drag-to-assign : ticket LIBRE déplacé par un membre -> auto-assigné ; déplacer celui d'un autre -> 403 ; admin exempt
+    const libreR = await f(`/api/ticketing/projets/${proj.id}/tickets`, { method: 'POST', body: { titre: 'À prendre' } });
+    const libre = await libreR.json().catch(() => null);
+    const prise = await f(`/api/ticketing/tickets/${libre.id}`, { method: 'PATCH', cookie: cAgent, body: { statut: 'en_cours' } });
+    const priseJ = await prise.json().catch(() => null);
+    prise.status === 200 && priseJ?.assignee?.id === agent.id
+      ? ok('ticketing #3 : ticket libre déplacé → auto-assigné au déplaceur')
+      : ko(`ticketing #3 : drag-to-assign (status ${prise.status}, assignee ${priseJ?.assignee?.id})`);
+    const vol = await f(`/api/ticketing/tickets/${libre.id}`, { method: 'PATCH', cookie: cAutre, body: { statut: 'en_attente' } });
+    vol.status === 403 ? ok('ticketing #3 : déplacer le ticket d\'un autre = interdit (403)') : ko(`ticketing #3 : vol de ticket non bloqué (status ${vol.status})`);
+    const adminMove = await f(`/api/ticketing/tickets/${libre.id}`, { method: 'PATCH', body: { statut: 'a_faire' } });
+    adminMove.status === 200 ? ok('ticketing #3 : admin peut déplacer tout ticket') : ko(`ticketing #3 : admin move (status ${adminMove.status})`);
 
     const stats = await jget('/api/ticketing/stats');
     stats.status === 200 && typeof stats.body?.total === 'number' && stats.body.parStatut

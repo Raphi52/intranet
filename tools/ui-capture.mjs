@@ -63,6 +63,8 @@ async function seed() {
   await post(`/api/ticketing/projets/${proj.id}/tickets`, { titre: 'Mettre à jour la doc VPN', type: 'tache', priorite: 'basse' });
   await patch(`/api/ticketing/tickets/${t1.id}`, { statut: 'en_cours' });
   await patch(`/api/ticketing/tickets/${t2.id}`, { statut: 'en_attente' });
+  // Onboarding : une fiche à nom TRÈS long pour vérifier la troncature (ellipsis) des cards.
+  await post('/api/onboarding/collaborateurs', { prenom: 'Jean-Baptiste', nom: 'De La Tour Du Pin Chambly Montmorency Laval De La Roche Aymon Très Long', intitule_poste: 'Responsable adjoint du pôle exploitation et coordination inter-services régionaux' });
   return proj.id;
 }
 
@@ -160,11 +162,12 @@ try {
   // 3) Vues connectées (navigation par hash, sans reload)
   const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board');
   const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
+  const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');
   const okAccueil = await capturerHash('#/', 'accueil', '.grille-sections, .grille, .vide');
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okAccueil && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okOnb && okAccueil && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);

@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { store, rafraichir, PRIO_LABEL } from './store.js';
 import { ouvrirModale, fermerModale } from '../../core/modal.js';
 import { echappe, toast, formatHorodatage } from '../../core/ui.js';
+import { moiCourant } from '../../core/identite.js';
 
 // ===================== Accueil : stats + cartes projets =====================
 export async function renduAccueil(app) {
@@ -131,9 +132,15 @@ async function dessinerBoard(app, projet) {
       const statut = zone.dataset.statut;
       const ticket = tickets.find((t) => t.id === id);
       if (!ticket || ticket.statut === statut) return;
+      // On ne déplace que son propre ticket ou un ticket libre (qu'on s'attribue). Admin exempté.
+      const moi = moiCourant();
+      if (ticket.assignee && moi && ticket.assignee.id !== moi.id && moi.role !== 'admin') {
+        toast(`Assigné à ${ticket.assignee.nom} — réassignez-le d'abord pour le déplacer.`, 'err');
+        return;
+      }
       try {
-        await api.majTicket(id, { statut });
-        toast('Ticket déplacé', 'ok');
+        const maj = await api.majTicket(id, { statut });
+        toast(maj?.assignee?.id === moi?.id && !ticket.assignee ? 'Ticket pris en charge' : 'Ticket déplacé', 'ok');
         await dessinerBoard(app, projet);
       } catch (err) {
         toast(err.message, 'err');

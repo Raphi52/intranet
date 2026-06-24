@@ -177,9 +177,18 @@ router.patch('/tickets/:id', (req, res) => {
     if (data.assignee_id && !personneExiste(data.assignee_id)) return res.status(400).json({ erreur: 'Personne assignée inconnue.' });
   }
   if (body.statut !== undefined) {
-    const pid = ticketProjet(id);
-    if (pid === null) return res.status(404).json({ erreur: 'Ticket introuvable' });
-    if (!statutValide(pid, body.statut)) return res.status(400).json({ erreur: 'Statut invalide pour ce projet.' });
+    const courant = getTicket(id);
+    if (!courant) return res.status(404).json({ erreur: 'Ticket introuvable' });
+    if (!statutValide(courant.project_id, body.statut)) return res.status(400).json({ erreur: 'Statut invalide pour ce projet.' });
+    if (body.statut !== courant.statut) {
+      // Déplacement : on ne déplace QUE son propre ticket ou un ticket libre (qu'on s'attribue). Admin = exempt.
+      const assigneId = courant.assignee_id ?? null;
+      if (assigneId && assigneId !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ erreur: 'Ce ticket est assigné a quelqu\'un d\'autre — réassignez-le avant de le déplacer.' });
+      }
+      // « Je le prends » : déplacer un ticket NON assigné me l'assigne (sauf si l'appel fixe déjà un assigné).
+      if (!assigneId && !('assignee_id' in body)) data.assignee_id = req.user.id;
+    }
   }
   const t = majTicket(id, data, req.operateur);
   return t ? res.json(t) : res.status(404).json({ erreur: 'Ticket introuvable' });

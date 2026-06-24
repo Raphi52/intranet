@@ -156,14 +156,22 @@ const CHAMPS_IDENTITE = [
   'intitule_poste',
 ];
 
-// Longueur max d'un champ d'identité (garde-fou anti-abus / grossissement de la base).
-const MAX_CHAMP = 200;
+// Longueur max d'un champ d'identité (garde-fou anti-abus / casse de l'UI / grossissement de la base).
+const MAX_CHAMP = 120;
+
+// Nettoie un champ d'identité : retire retours de ligne + caractères de contrôle (qui cassent
+// le rendu des cards), réduit les espaces multiples, plafonne la longueur.
+function nettoyerChamp(v) {
+  return String(v ?? '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ') // \n \r \t + caractères de contrôle -> espace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_CHAMP);
+}
 
 function normaliseIdentite(data = {}) {
   const out = {};
-  for (const champ of CHAMPS_IDENTITE) {
-    out[champ] = (data[champ] ?? '').toString().trim().slice(0, MAX_CHAMP);
-  }
+  for (const champ of CHAMPS_IDENTITE) out[champ] = nettoyerChamp(data[champ]);
   return out;
 }
 

@@ -243,15 +243,27 @@ a {
   font-size: 1.05rem;
   background: var(--gris);
 }
+/* Le conteneur texte (à côté de l'avatar) doit pouvoir rétrécir pour que l'ellipsis s'applique. */
+.carte-collab__haut > div {
+  min-width: 0;
+  flex: 1;
+}
+/* Nom / poste : tronqués (…) -> un nom long ou collé ne casse jamais la mise en page de la carte. */
 .carte-collab__nom {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .carte-collab__poste {
   margin: 2px 0 0;
   font-size: 0.85rem;
   color: var(--gris-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .puce {
@@ -1135,13 +1147,17 @@ a {
   color: var(--rouge);
 }
 
-/* Board Kanban */
+/* Board Kanban — PLEINE LARGEUR : s'affranchit du max-width du portail (.contenu) via le
+   breakout viewport (margin négative), tout en gardant un padding aligné sur les bords. */
 .tk-board {
   display: flex;
   gap: 14px;
   overflow-x: auto;
-  padding-bottom: 12px;
+  padding: 0 clamp(16px, 4vw, 40px) 12px;
   align-items: flex-start;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
 }
 .tk-col {
   background: #eef1f6;
