@@ -1,136 +1,121 @@
-# 🚀 Onboarding Amitel
+# 🚀 Portail Amitel
 
-Application web **ludique** pour l'accueil des nouveaux collaborateurs Amitel.
-Elle remplace le fichier Excel « Checklist Nouveau Collaborateur » par une
-checklist interactive, suivie en temps réel, aux couleurs de l'entreprise.
+Portail web **interne** d'Amitel : un point d'entrée unique, **derrière authentification**,
+qui regroupe l'onboarding des nouveaux collaborateurs, un système de tickets, un mur de
+publications, des événements et la gestion des comptes. SPA légère **sans build**, aux
+couleurs de l'entreprise, avec **mode clair / sombre**.
 
 ![Charte : rouge amitel + gris ardoise](https://img.shields.io/badge/charte-amitel-C0392B)
 
-## ✨ Ce que fait l'application
+## ✨ Modules
 
-- **Tableau de bord** : toutes les fiches d'onboarding en cours, avec leur taux
-  d'avancement.
-- **Fiche collaborateur** reprenant fidèlement l'Excel :
-  - 🪪 **Fiche identité** (nom, prénom, service, dates, contrat, poste)
-  - 🔑 **Demandes d'accès** à anticiper (SQL, EXPRESSO, téléphonie, MS365, ZenDesk, VPN, RA)
-  - Les **4 parties** du parcours, dans l'ordre :
-    🗂️ Administratif → ⚙️ Exploitation → 💶 Comptabilité → ⚖️ Judiciaire
-  - Chaque tâche : case à cocher, intitulé, détails, responsable, type de profil, commentaire
-- **Côté ludique** : barres et anneau de progression animés, sections qui se
-  replient une fois terminées, bannières « Prévenir la partie suivante » qui
-  s'allument, et **confettis** 🎉 quand l'onboarding atteint 100 %.
-- **Sauvegarde automatique** : chaque coche, commentaire ou champ est enregistré
-  immédiatement dans une base **SQLite** (pas de bouton « Enregistrer »).
-- **Impression** : un onboarding peut être imprimé / exporté en PDF (bouton 🖨️).
+- 🏠 **Accueil** — grille des sections + **mur de publications** (annonces internes : titre +
+  texte ; création par tout utilisateur connecté ; édition/suppression par l'auteur ou un admin ;
+  épinglage admin).
+- 🚀 **Onboarding** — checklist interactive d'accueil (remplace l'Excel) : fiche identité,
+  demandes d'accès à anticiper, les **4 parties** (🗂️ Administratif → ⚙️ Exploitation →
+  💶 Comptabilité → ⚖️ Judiciaire), cases à cocher, commentaires, barres/anneau de progression,
+  **confettis** 🎉 à 100 %. Sauvegarde immédiate (pas de bouton « Enregistrer »).
+- 🎫 **Tickets** — gestion type Jira **multi-projets** : tableau (board) par statut, priorités +
+  **échéance SLA**, commentaires, historique, assignation. Projets **privés** réservés aux membres.
+  **Édition, réassignation et suppression réservées au créateur du ticket (ou à un admin).**
+- 📅 **Événements** — création d'événements + inscription/désinscription en 1 clic, **compteur et
+  liste des participants**.
+- 👥 **Comptes** *(admin)* — création et gestion des comptes utilisateurs (= registre des personnes
+  assignables aux tickets).
+- 📚 **Docs internes** — base de connaissances *(en cours)*.
+- 🔔 **Notifications** — **cloche** dans la barre latérale (badge de non-lus) : nouvelle publication,
+  nouvel événement, ou ticket qui **vous** est assigné.
+
+## 🔐 Authentification & accès
+
+- **Login obligatoire** (e-mail + mot de passe) pour accéder à tout le portail ; **sessions
+  vérifiées côté serveur** (cookie HttpOnly), mots de passe hachés (**scrypt**).
+- **Comptes provisionnés par un admin** ; rôles **admin** / **membre**. Le premier admin est
+  amorcé via les variables `ADMIN_EMAIL` / `ADMIN_PASSWORD` (sinon mot de passe aléatoire affiché
+  une fois dans les logs).
+- Accès aux **projets privés** par **appartenance explicite**, appliquée par identité vérifiée.
+
+## 🎨 Interface
+
+- **Barre latérale gauche rétractable** : icônes repliées, libellés au survol ; **logo + cloche de
+  notifications** dans l'en-tête.
+- **Mode clair / sombre** mémorisé, direction graphique « Linéaire » (sobre, précise), charte
+  **rouge amitel**.
 
 ## 🧱 Stack technique
 
-| Élément   | Choix                                          |
-|-----------|------------------------------------------------|
-| Backend   | Node.js + Express                              |
-| Base      | SQLite (`better-sqlite3`), fichier `data/onboarding.db` |
-| Frontend  | HTML / CSS / JavaScript (modules ES), **sans build** |
-| Polices   | Poppins + Inter (Google Fonts, repli système)  |
+| Élément  | Choix |
+|----------|-------|
+| Backend  | Node.js + Express (modules ES) |
+| Base     | SQLite (`better-sqlite3`), fichier `data/onboarding.db` |
+| Frontend | HTML / CSS / JavaScript (modules ES) — **SPA à routeur par hash, sans build** |
+| Polices  | Poppins + Inter (Google Fonts, repli système) |
 
-Aucune étape de compilation : le serveur Express sert directement le dossier
-`public/`.
+Aucune étape de compilation : Express sert directement `public/`.
 
-## ▶️ Démarrage
+## ▶️ Démarrage (développement)
 
-Prérequis : **Node.js ≥ 18** (testé sur Node 22).
+Prérequis : **Node.js ≥ 18**.
 
 ```bash
 npm install      # installe les dépendances (compile SQLite)
-npm start        # démarre le serveur
+npm start        # démarre le serveur -> http://localhost:3000
 ```
 
-Puis ouvrez **http://localhost:3000**.
-
-> Astuce : `npm run dev` redémarre automatiquement à chaque modification.
-> Le port peut être changé via la variable d'environnement `PORT`.
-
-## 🐳 Docker
-
-> 📘 **Guide d'installation / déploiement complet (pour mise en service serveur) :
-> [INSTALLATION.md](INSTALLATION.md)** — prérequis, `.env`, exploitation, sauvegarde, dépannage.
-
-Conteneur **autonome** (port publié), pensé pour coexister avec d'autres
-conteneurs sur le serveur cible. Image multi-stage : `better-sqlite3` est compilé
-dans un stage jetable, l'image finale reste légère et tourne en **non-root**.
+Au premier lancement, définissez le compte admin (sinon un mot de passe aléatoire est affiché
+dans la console) :
 
 ```bash
-docker compose up -d --build        # build + démarrage (port 8080)
-HOST_PORT=9000 docker compose up -d  # publier sur un autre port hôte
-docker compose logs -f               # suivre les logs
-docker compose down                  # arrêter (la base est CONSERVÉE)
+ADMIN_EMAIL=admin@amitel.fr ADMIN_PASSWORD=un-mot-de-passe npm start
 ```
 
-> **Compte admin (une fois, avant le 1er `up`)** : copiez `.env.example` en
-> `.env` et renseignez `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Sans cela, un mot de
-> passe aléatoire est généré et visible via `docker compose logs`.
+> `npm run dev` redémarre automatiquement à chaque modification. Port configurable via `PORT`.
 
-Puis ouvrez **http://localhost:8080** (ou `http://<serveur>:8080`).
+## 🐳 Déploiement Docker
 
-- **Persistance** : la base SQLite vit dans le volume nommé **`portail-data`**
-  (monté sur `/app/data`). Elle survit aux `down`/`up` et aux reconstructions.
-- ⚠️ `docker compose down -v` **supprime** ce volume → perte des données.
-- **Variables** : `HOST_PORT` (port hôte, défaut `8080`), `TZ` (fuseau, défaut
-  `Europe/Paris`).
-
-### Sauvegarde / restauration du volume
+Conteneur **autonome** : une commande build l'image (better-sqlite3 compilé dans un stage
+jetable, runtime léger **non-root**) et démarre l'app, base persistée dans un volume nommé.
 
 ```bash
-# Sauvegarde -> sauvegarde-portail.tgz
-docker run --rm -v portail-data:/data -v "$PWD":/sortie alpine \
-  tar czf /sortie/sauvegarde-portail.tgz -C /data .
-
-# Restauration
-docker run --rm -v portail-data:/data -v "$PWD":/sortie alpine \
-  tar xzf /sortie/sauvegarde-portail.tgz -C /data
+cp .env.example .env              # renseigner ADMIN_EMAIL / ADMIN_PASSWORD
+docker compose up -d --build      # build + démarrage -> http://localhost:8080
 ```
 
-> Pour repartir d'une base existante (poste de dev → conteneur), remplacez le
-> volume nommé par un bind-mount dans `docker-compose.yml` :
-> `- ./data:/app/data`.
+📘 **Guide d'installation / déploiement complet (serveur, `.env`, exploitation, sauvegarde,
+dépannage) : [INSTALLATION.md](INSTALLATION.md).**
 
-## 🗂️ Structure du projet
+## 🗂️ Architecture (modulaire)
+
+Le serveur ne connaît **aucune section en propre** : il met en place le socle commun (auth,
+JSON, statiques, SPA) puis monte **toutes les sections déclarées**. Ajouter une section =
+un dossier serveur + un manifeste front + 1 ligne dans chaque registre.
 
 ```
-.
-├── server/
-│   ├── index.js      # serveur Express + API REST
-│   ├── db.js         # base SQLite (schéma + requêtes)
-│   └── template.js   # ⭐ contenu de la checklist (à personnaliser)
-├── public/
-│   ├── index.html
-│   ├── css/styles.css
-│   └── js/           # app (routeur), api, ui, modal, store + vues
-└── data/             # base SQLite générée ici (non versionnée)
+server/
+  core/        # db, auth (+ auth-routes), notifications (+ notif-routes)
+  sections/    # onboarding, ticketing, publications, evenements, docs (+ index.js = registre)
+  index.js     # shell : sécurité + middleware auth -> monte les sections
+public/
+  js/core/     # app (routeur + shell), http, identite, ui, modal, home, cloche
+  js/sections/ # une vue par section (onboarding, ticketing, evenements, admin, docs)
+  css/styles.css
+tools/         # smoke.mjs, test-migration.mjs, ui-capture.mjs (vérification)
+data/          # base SQLite générée ici (non versionnée)
 ```
 
-## ✏️ Personnaliser la checklist
+Le contenu « métier » de l'onboarding (parties, demandes d'accès, tâches par service) est
+centralisé dans **`server/sections/onboarding/template.js`**.
 
-Tout le contenu « métier » est centralisé dans **`server/template.js`** :
-parties, demandes d'accès, et liste des tâches par service (avec responsable et
-type de profil). Modifiez ce fichier pour faire évoluer la checklist commune.
+## ✅ Vérification
 
-> Les fiches **déjà créées** conservent leur propre copie des tâches ; seules les
-> **nouvelles** fiches reflètent les modifications du modèle.
+```bash
+npm run smoke               # assertions HTTP de bout en bout (parcours réel derrière l'auth)
+node tools/ui-capture.mjs   # captures d'écran clair + sombre -> tools/captures/
+```
 
-## 🔌 API REST (résumé)
+## 💾 Données
 
-| Méthode & route                     | Rôle                                   |
-|-------------------------------------|----------------------------------------|
-| `GET /api/meta`                     | Services, types de contrat, parties    |
-| `GET /api/collaborateurs`           | Liste + progression                    |
-| `POST /api/collaborateurs`          | Crée une fiche (+ checklist)           |
-| `GET /api/collaborateurs/:id`       | Fiche complète                         |
-| `PUT /api/collaborateurs/:id`       | Met à jour l'identité                  |
-| `DELETE /api/collaborateurs/:id`    | Supprime une fiche                     |
-| `PATCH /api/taches/:id`             | Coche une tâche / commentaire          |
-| `PATCH /api/demandes/:id`           | Active une demande d'accès             |
-
-## 💾 Sauvegarde des données
-
-Toutes les données sont dans le fichier `data/onboarding.db`. Pour sauvegarder
-ou transférer, copiez simplement ce fichier.
+Tout est dans `data/onboarding.db` (en Docker : volume **`portail-amitel_portail-data`**).
+Sauvegarde : copier le fichier (dev) ou le volume (Docker — commandes dans
+[INSTALLATION.md](INSTALLATION.md)).
