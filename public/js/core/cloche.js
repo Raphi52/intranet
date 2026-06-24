@@ -43,9 +43,8 @@ function dessiner() {
   if (!hote) return;
   const n = etat.nonLus || 0;
   hote.innerHTML = `
-    <button class="cloche__btn ${n ? 'a-du-neuf' : ''}" id="cloche-btn" aria-label="Notifications" title="Notifications" aria-expanded="${ouvert}">
+    <button class="cloche__btn ${n ? 'a-du-neuf' : ''}" id="cloche-btn" aria-label="Notifications${n ? ` (${n} non lue${n > 1 ? 's' : ''})` : ''}" title="Notifications" aria-expanded="${ouvert}">
       <span class="cloche__icone" aria-hidden="true">🔔</span>
-      <span class="cloche__txt">Notifications</span>
       ${n ? `<span class="cloche__badge">${n > 99 ? '99+' : n}</span>` : ''}
     </button>
     ${ouvert ? panneau() : ''}`;

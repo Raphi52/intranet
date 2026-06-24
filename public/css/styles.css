@@ -29,7 +29,7 @@
   --rayon-sm: 9px;
   --transition: 0.18s ease;
   --largeur-max: 1080px;
-  --cote-w: 64px; /* largeur de la sidebar repliée (icônes) — réservée en permanence */
+  --cote-w: 72px; /* largeur de la sidebar repliée (icônes) — réservée en permanence */
 }
 
 * {
@@ -109,6 +109,7 @@ a {
   color: var(--gris-3);
   border-radius: 8px;
   padding: 6px 8px;
+  margin-left: auto; /* pousse le chevron à droite ; logo + cloche restent groupés à gauche */
 }
 .cote__toggle:hover {
   background: var(--fond);
@@ -1869,55 +1870,64 @@ body.sombre .relais {
 }
 
 /* ---------------------------- Cloche de notifications -------------------- */
+/* Bouton-icône compact dans l'en-tête de la sidebar, à côté du logo. */
 .cote__cloche {
-  padding: 0 12px;
-  margin-bottom: 4px;
-}
-.cloche__btn {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 9px 10px;
+  flex-shrink: 0;
+}
+.cloche__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   cursor: pointer;
-  border-radius: 10px;
   color: var(--gris-2);
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  white-space: nowrap;
+  border-radius: 9px;
+  padding: 5px;
+  line-height: 1;
 }
 .cloche__btn:hover {
   background: var(--fond);
   color: var(--gris);
 }
 .cloche__icone {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   line-height: 1;
-  flex-shrink: 0;
-}
-/* Replié (sidebar icônes) : on masque le libellé comme les liens de nav. */
-.cote:not(.is-ouvert) .cloche__txt {
-  font-size: 0;
 }
 .cloche__badge {
   position: absolute;
-  top: 3px;
-  left: 22px;
-  min-width: 17px;
-  height: 17px;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: 999px;
   background: var(--rouge);
   color: #fff;
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  line-height: 17px;
+  line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--carte);
+}
+/* Replié : logo + cloche compacts, centrés, tiennent dans le rail étroit sans rognure. */
+.cote:not(.is-ouvert) .cote__haut {
+  gap: 2px;
+  padding: 2px 0;
+}
+.cote:not(.is-ouvert) .logo__mark {
+  width: 26px;
+  height: 26px;
+}
+.cote:not(.is-ouvert) .cloche__btn {
+  padding: 2px;
+}
+.cote:not(.is-ouvert) .cloche__icone {
+  font-size: 1.15rem;
 }
 /* Panneau (position: fixed, ancré au bouton via JS). */
 .cloche-panneau {
