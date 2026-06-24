@@ -51,6 +51,9 @@ Puis ouvrez **http://localhost:3000**.
 
 ## 🐳 Docker
 
+> 📘 **Guide d'installation / déploiement complet (pour mise en service serveur) :
+> [INSTALLATION.md](INSTALLATION.md)** — prérequis, `.env`, exploitation, sauvegarde, dépannage.
+
 Conteneur **autonome** (port publié), pensé pour coexister avec d'autres
 conteneurs sur le serveur cible. Image multi-stage : `better-sqlite3` est compilé
 dans un stage jetable, l'image finale reste légère et tourne en **non-root**.
