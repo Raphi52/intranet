@@ -94,16 +94,24 @@ function afficherBadge() {
     zone.innerHTML = '';
     return;
   }
+  const sombre = document.body.classList.contains('sombre');
   zone.innerHTML = `
     <span class="op-badge" title="Connecté — vos actions sont signées de ce badge">
       <span class="op-badge__pastille" aria-hidden="true">${echappe(badge[0])}</span>
       <span class="op-badge__nom">${echappe(badge)}</span>
     </span>
-    <button class="bouton bouton--fantome bouton--sm" id="op-deconnexion">Déconnexion</button>`;
+    <div class="cote__bas">
+      <button class="bouton bouton--fantome bouton--sm" id="op-deconnexion">Déconnexion</button>
+      <button class="cote__theme" id="theme-toggle" aria-label="Thème clair / sombre" title="Thème clair / sombre">${sombre ? '☀️' : '🌙'}</button>
+    </div>`;
   zone.querySelector('#op-deconnexion').addEventListener('click', async () => {
     await deconnexion();
     location.hash = '#/';
     routeur();
+  });
+  zone.querySelector('#theme-toggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    basculerTheme();
   });
 }
 
@@ -163,29 +171,26 @@ function brancherCote() {
   const ouvrir = () => { clearTimeout(minuteur); cote.classList.add('is-ouvert'); };
   const fermer = () => { clearTimeout(minuteur); cote.classList.remove('is-ouvert'); };
   cote.addEventListener('mouseenter', ouvrir);
-  const planifierFermeture = () => { clearTimeout(minuteur); minuteur = setTimeout(fermer, 2000); }; // sleep-ok: délai UX voulu (replier 2 s après sortie souris), pas un sleep de test
+  const planifierFermeture = () => { clearTimeout(minuteur); minuteur = setTimeout(fermer, 500); }; // sleep-ok: délai UX voulu (replier 0,5 s après sortie souris), pas un sleep de test
   cote.addEventListener('mouseleave', planifierFermeture);
   document.getElementById('cote-toggle')?.addEventListener('click', (e) => { e.stopPropagation(); fermer(); });
 }
 
-// Bascule de thème clair / sombre, mémorisée (localStorage).
-function brancherTheme() {
+// Thème clair / sombre, mémorisé (localStorage). Le bouton vit dans l'en-tête de la sidebar
+// (rendu par afficherBadge, sur la même ligne que Déconnexion).
+function appliquerTheme() {
+  document.body.classList.toggle('sombre', localStorage.getItem('portail.theme') === 'sombre');
+}
+function basculerTheme() {
+  const sombre = !document.body.classList.contains('sombre');
+  localStorage.setItem('portail.theme', sombre ? 'sombre' : 'clair');
+  document.body.classList.toggle('sombre', sombre);
   const btn = document.getElementById('theme-toggle');
-  const appliquer = (sombre) => {
-    document.body.classList.toggle('sombre', sombre);
-    if (btn) btn.textContent = sombre ? '☀️' : '🌙';
-  };
-  appliquer(localStorage.getItem('portail.theme') === 'sombre');
-  btn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const sombre = !document.body.classList.contains('sombre');
-    localStorage.setItem('portail.theme', sombre ? 'sombre' : 'clair');
-    appliquer(sombre);
-  });
+  if (btn) btn.textContent = sombre ? '☀️' : '🌙';
 }
 
 async function demarrer() {
-  brancherTheme(); // applique le thème mémorisé au plus tôt
+  appliquerTheme(); // applique le thème mémorisé au plus tôt
   await chargerMoi(); // récupère la session existante (cookie) au chargement
   brancherCote();
   window.addEventListener('hashchange', routeur);
