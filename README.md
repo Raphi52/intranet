@@ -62,6 +62,10 @@ docker compose logs -f               # suivre les logs
 docker compose down                  # arrêter (la base est CONSERVÉE)
 ```
 
+> **Compte admin (une fois, avant le 1er `up`)** : copiez `.env.example` en
+> `.env` et renseignez `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Sans cela, un mot de
+> passe aléatoire est généré et visible via `docker compose logs`.
+
 Puis ouvrez **http://localhost:8080** (ou `http://<serveur>:8080`).
 
 - **Persistance** : la base SQLite vit dans le volume nommé **`portail-data`**

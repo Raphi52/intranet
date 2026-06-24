@@ -9,6 +9,11 @@
 #   HOST_PORT=9000 docker compose up -d   # autre port hôte
 # =============================================================================
 
+# Nom du projet Compose : l'app apparaît sous ce libellé dans Docker Desktop
+# (groupe « portail-amitel » de l'onglet Containers), à côté des autres apps,
+# avec son propre conteneur, son volume et son port — sans interférer.
+name: portail-amitel
+
 services:
   portail:
     build: .
@@ -22,6 +27,9 @@ services:
       NODE_ENV: production
       PORT: "3000"
       PORTAIL_DB: /app/data/onboarding.db
+      # Compte admin amorcé au 1er démarrage (depuis .env ; sinon mot de passe aléatoire en logs).
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Fuseau pour l'horodatage des signatures (datetime SQLite reste en UTC).
       TZ: ${TZ:-Europe/Paris}
     volumes:
