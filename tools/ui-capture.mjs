@@ -175,7 +175,10 @@ try {
   if (!connecte) erreurs.push('connexion UI : badge opérateur non apparu après soumission du formulaire');
 
   // 3) Vues connectées (navigation par hash, sans reload)
-  const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board');
+  const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board'); // sidebar repliée
+  // Déplie la sidebar (clic) pour capturer l'état étendu sur les vues suivantes.
+  await envoyer('Runtime.evaluate', { expression: `document.getElementById('cote').click()`, returnByValue: true }, session);
+  await wait(250);
   const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
   const okEvt = await capturerHash('#/evenements/', 'evenements', '.evt-liste');
   const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');

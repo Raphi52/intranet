@@ -18,32 +18,24 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
-    <header class="entete">
-      <a class="logo" href="#/" aria-label="Accueil Portail Amitel">
-        <svg class="logo__mark" viewBox="0 0 44 44" width="40" height="40" aria-hidden="true">
-          <rect x="1" y="1" width="42" height="42" rx="11" fill="var(--rouge)" />
-          <text
-            x="22"
-            y="32"
-            text-anchor="middle"
-            font-family="Poppins, sans-serif"
-            font-size="30"
-            font-weight="700"
-            fill="#fff"
-          >
-            a
-          </text>
-        </svg>
-        <span class="logo__texte">mitel</span>
-        <span class="logo__sep" aria-hidden="true"></span>
-        <span class="logo__app">Portail</span>
-      </a>
+    <!-- Menu LATÉRAL gauche, rétractable (icônes repliées / icônes+libellés déplié). -->
+    <aside class="cote" id="cote">
+      <div class="cote__haut">
+        <a class="logo" href="#/" aria-label="Accueil Portail Amitel">
+          <svg class="logo__mark" viewBox="0 0 44 44" width="34" height="34" aria-hidden="true">
+            <rect x="1" y="1" width="42" height="42" rx="11" fill="var(--rouge)" />
+            <text x="22" y="32" text-anchor="middle" font-family="Poppins, sans-serif" font-size="30" font-weight="700" fill="#fff">a</text>
+          </svg>
+          <span class="logo__texte">mitel</span>
+        </a>
+        <button class="cote__toggle" id="cote-toggle" aria-label="Déplier ou replier le menu" title="Déplier / replier">»</button>
+      </div>
 
       <!-- Navigation entre sections — peuplée dynamiquement depuis le registre front. -->
       <nav id="portail-nav" class="nav" aria-label="Sections du portail"></nav>
 
       <div class="entete__actions" id="entete-actions"></div>
-    </header>
+    </aside>
 
     <main id="app" class="contenu">
       <div class="chargement">Chargement…</div>

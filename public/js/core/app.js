@@ -110,6 +110,8 @@ function afficherBadge() {
 async function routeur() {
   const hash = location.hash || '#/';
   window.scrollTo(0, 0);
+  // Masque la sidebar tant qu'on n'est pas connecté (écran de login pleine page).
+  document.body.classList.toggle('hors-ligne', !moiCourant());
 
   // Pas de session valide → écran de connexion (bloque tout accès, même une URL directe).
   if (!moiCourant()) {
@@ -152,8 +154,27 @@ async function routeur() {
   }
 }
 
+// Sidebar rétractable : toggle + état mémorisé. Repliée, un clic n'importe où dans la
+// sidebar la déplie (le chevron n'est visible que dépliée pour replier).
+function brancherCote() {
+  const cote = document.getElementById('cote');
+  const toggle = document.getElementById('cote-toggle');
+  if (!cote || !toggle) return;
+  cote.classList.toggle('is-ouvert', localStorage.getItem('portail.menu') === 'ouvert');
+  const setOuvert = (on) => {
+    cote.classList.toggle('is-ouvert', on);
+    localStorage.setItem('portail.menu', on ? 'ouvert' : 'reduit');
+  };
+  toggle.addEventListener('click', (e) => { e.stopPropagation(); setOuvert(false); });
+  // Replié : un clic sur la sidebar (hors lien de nav) la déplie.
+  cote.addEventListener('click', (e) => {
+    if (!cote.classList.contains('is-ouvert') && !e.target.closest('.nav__lien, #op-deconnexion')) setOuvert(true);
+  });
+}
+
 async function demarrer() {
   await chargerMoi(); // récupère la session existante (cookie) au chargement
+  brancherCote();
   window.addEventListener('hashchange', routeur);
   // Session expirée détectée par un appel API → on recharge l'identité et réaffiche.
   window.addEventListener('portail:401', async () => {

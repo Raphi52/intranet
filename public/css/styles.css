@@ -29,6 +29,7 @@
   --rayon-sm: 10px;
   --transition: 0.18s ease;
   --largeur-max: 1080px;
+  --cote-w: 64px; /* largeur de la sidebar repliée (icônes) — réservée en permanence */
 }
 
 * {
@@ -46,6 +47,14 @@ body {
   background: var(--fond);
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
+  padding-left: var(--cote-w); /* place réservée à la sidebar (fixe à gauche) */
+}
+/* Hors-ligne (écran de connexion) : pas de sidebar, contenu pleine page. */
+body.hors-ligne {
+  padding-left: 0;
+}
+body.hors-ligne .cote {
+  display: none;
 }
 
 h1,
@@ -62,18 +71,57 @@ a {
 }
 
 /* ----------------------------- En-tête ---------------------------------- */
-.entete {
-  position: sticky;
+/* ----------------------------- Sidebar gauche --------------------------- */
+.cote {
+  position: fixed;
+  left: 0;
   top: 0;
-  z-index: 20;
+  bottom: 0;
+  width: var(--cote-w);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 8px;
+  background: #fff;
+  border-right: 1px solid var(--bordure);
+  overflow: hidden;
+  transition: width var(--transition), box-shadow var(--transition);
+}
+.cote.is-ouvert {
+  width: 224px; /* dépliée : overlay (ne pousse pas le contenu) */
+  box-shadow: var(--ombre-forte);
+}
+.cote__haut {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px clamp(16px, 4vw, 40px);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--bordure);
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 4px;
+}
+.cote__toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--gris-3);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.cote__toggle:hover {
+  background: var(--fond);
+  color: var(--gris);
+}
+.cote.is-ouvert .cote__toggle {
+  transform: rotate(180deg); /* « » -> « repliez » */
+}
+.cote:not(.is-ouvert) .cote__haut {
+  justify-content: center;
+}
+.cote:not(.is-ouvert) .cote__toggle {
+  display: none; /* replié : on déplie en cliquant n'importe où dans la sidebar (voir JS) ; le chevron réapparaît déplié */
 }
 
 .logo {
@@ -81,33 +129,27 @@ a {
   align-items: center;
   gap: 2px;
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   color: var(--gris);
   letter-spacing: -0.5px;
+  overflow: hidden;
 }
-
 .logo__mark {
-  margin-right: 4px;
   filter: drop-shadow(0 4px 8px rgba(192, 57, 43, 0.25));
+  flex-shrink: 0;
 }
-
-.logo__sep {
-  width: 1px;
-  height: 22px;
-  background: var(--bordure-forte);
-  margin: 0 12px;
-}
-
-.logo__app {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--rouge);
-  font-family: 'Inter', sans-serif;
+.cote:not(.is-ouvert) .logo__texte,
+.cote:not(.is-ouvert) .logo__sep,
+.cote:not(.is-ouvert) .logo__app {
+  display: none; /* replié : seulement la pastille « a » */
 }
 
 .entete__actions {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: auto; /* poussé en bas de la sidebar */
 }
 
 /* ----------------------------- Contenu ---------------------------------- */
@@ -838,7 +880,7 @@ a {
 /* --------------------------- Impression --------------------------------- */
 /* fix-ok: audit front (UX/a11y) — impression PDF propre, focus visible, état non-sauvegardé, reduced-motion */
 @media print {
-  .entete,
+  .cote,
   .entete__actions,
   .confetti,
   .toasts,
@@ -903,21 +945,21 @@ a {
 /* ===================== Portail : navigation entre sections ================ */
 .nav {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
-  margin-right: auto; /* pousse les actions à droite */
-  margin-left: 8px;
-  flex-wrap: wrap;
+  margin: 10px 0;
 }
 .nav__lien {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 999px;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--gris-2);
+  white-space: nowrap;
   transition: background var(--transition), color var(--transition);
 }
 .nav__lien:hover {
@@ -929,8 +971,26 @@ a {
   color: #fff;
 }
 .nav__icone {
-  font-size: 1rem;
+  font-size: 1.2rem;
   line-height: 1;
+  width: 26px;
+  text-align: center;
+  flex-shrink: 0;
+}
+/* Replié : on masque le libellé (nœud texte) via font-size:0 ; l'icône garde sa taille. */
+.cote:not(.is-ouvert) .nav__lien {
+  font-size: 0;
+  justify-content: center;
+  padding: 10px 0;
+}
+/* Replié : badge opérateur = pastille seule, pas de nom ni bouton déconnexion (visible une fois déplié). */
+.cote:not(.is-ouvert) .op-badge {
+  padding: 4px;
+  justify-content: center;
+}
+.cote:not(.is-ouvert) .op-badge__nom,
+.cote:not(.is-ouvert) #op-deconnexion {
+  display: none;
 }
 .nav__lien:focus-visible {
   outline: 2px solid var(--rouge);
@@ -1155,9 +1215,10 @@ a {
   overflow-x: auto;
   padding: 0 clamp(16px, 4vw, 40px) 12px;
   align-items: flex-start;
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  /* Pleine largeur de la zone de contenu (à droite de la sidebar de --cote-w). */
+  width: calc(100vw - var(--cote-w));
+  margin-left: calc(50% - 50vw + var(--cote-w) / 2);
+  margin-right: 0;
 }
 .tk-col {
   background: #eef1f6;
