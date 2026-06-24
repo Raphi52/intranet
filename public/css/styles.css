@@ -12,21 +12,21 @@
   --gris-3: #8a92a0;
 
   /* Surfaces */
-  --fond: #f4f6f9;
+  --fond: #f6f7f9;
   --carte: #ffffff;
-  --bordure: #e6e9ef;
-  --bordure-forte: #d6dbe4;
+  --bordure: #eceef2;
+  --bordure-forte: #e0e3ea;
 
   /* États */
   --vert: #27ae60;
   --vert-clair: #eafaf1;
   --ambre: #f39c12;
 
-  /* Divers */
-  --ombre: 0 1px 2px rgba(20, 24, 33, 0.04), 0 6px 20px rgba(20, 24, 33, 0.06);
-  --ombre-forte: 0 10px 40px rgba(20, 24, 33, 0.14);
-  --rayon: 16px;
-  --rayon-sm: 10px;
+  /* Divers — ombres nettes + rayons précis (direction « Linéaire ») */
+  --ombre: 0 1px 2px rgba(20, 24, 33, 0.05), 0 4px 14px rgba(20, 24, 33, 0.06);
+  --ombre-forte: 0 14px 44px rgba(20, 24, 33, 0.13);
+  --rayon: 13px;
+  --rayon-sm: 9px;
   --transition: 0.18s ease;
   --largeur-max: 1080px;
   --cote-w: 64px; /* largeur de la sidebar repliée (icônes) — réservée en permanence */
@@ -171,19 +171,19 @@ a {
   align-items: center;
   gap: 8px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--rayon-sm);
   padding: 11px 20px;
   font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform var(--transition), box-shadow var(--transition),
-    background var(--transition);
-  background: var(--rouge);
+    filter var(--transition);
+  background: linear-gradient(180deg, #e0584b, #b5342a);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(192, 57, 43, 0.28);
+  box-shadow: 0 1px 2px rgba(181, 52, 42, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 .bouton:hover {
-  background: var(--rouge-hover);
+  filter: brightness(1.06);
   transform: translateY(-1px);
 }
 .bouton:active {
@@ -1566,43 +1566,28 @@ a {
   box-shadow: var(--ombre);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
-/* Liseré « shiny » dégradé en haut de chaque card. */
+/* Liseré rouge fin en haut de chaque card (accent net — pas de tache colorée). */
 .pub::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--rouge), #e0584b);
-}
-/* Reflet lumineux discret (coin haut-droit), translucide → neutre vis-à-vis du thème. */
-.pub::after {
-  content: '';
-  position: absolute;
-  top: -45%;
-  right: -8%;
-  width: 240px;
-  height: 240px;
-  background: radial-gradient(circle, rgba(192, 57, 43, 0.1), transparent 70%);
-  pointer-events: none;
+  height: 3px;
+  background: var(--rouge);
 }
 .pub:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow: var(--ombre-forte);
-  border-color: rgba(192, 57, 43, 0.35);
+  border-color: var(--bordure-forte);
 }
 .pub.is-epingle {
   border-color: var(--ambre);
   background: #fffdf6;
-  box-shadow: 0 10px 40px rgba(243, 156, 18, 0.18);
+  box-shadow: var(--ombre);
 }
 .pub.is-epingle::before {
-  height: 5px;
-  background: linear-gradient(90deg, var(--ambre), #f7c873);
-}
-.pub.is-epingle::after {
-  background: radial-gradient(circle, rgba(243, 156, 18, 0.16), transparent 70%);
+  background: var(--ambre);
 }
 /* Ruban « Épinglé » (mise en valeur). */
 .pub__ruban {
@@ -1671,12 +1656,10 @@ a {
   color: #fff;
   font-weight: 700;
   font-size: 1rem;
-  background: linear-gradient(135deg, var(--rouge), #e0584b);
-  box-shadow: 0 2px 10px rgba(192, 57, 43, 0.3);
+  background: var(--rouge);
 }
 .pub.is-epingle .pub__avatar {
-  background: linear-gradient(135deg, var(--ambre), #f7c873);
-  box-shadow: 0 2px 10px rgba(243, 156, 18, 0.3);
+  background: var(--ambre);
 }
 .pub__qui {
   display: flex;
@@ -1773,16 +1756,16 @@ a {
 /* ============================== DARK MODE =============================== */
 /* Le gros du thème passe par les variables ; on en redéfinit les valeurs en sombre. */
 body.sombre {
-  --fond: #15181e;
-  --carte: #1f242c;
-  --bordure: #2b323d;
-  --bordure-forte: #3a4350;
+  --fond: #0e1218;
+  --carte: #1b222c;
+  --bordure: #2c3543;
+  --bordure-forte: #3a4452;
   --gris: #e8ebf1;
-  --gris-2: #aeb8c4;
-  --gris-3: #828b99;
+  --gris-2: #a7b0bd;
+  --gris-3: #767f8d;
   --vert-clair: #15301e;
-  --ombre: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px rgba(0, 0, 0, 0.45);
-  --ombre-forte: 0 12px 44px rgba(0, 0, 0, 0.6);
+  --ombre: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ombre-forte: 0 16px 48px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 /* Surfaces codées en dur (composants antérieurs au système de variables) re-teintées. */
