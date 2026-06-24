@@ -1162,9 +1162,10 @@ a {
 .tk-col {
   background: #eef1f6;
   border-radius: var(--rayon-sm);
-  min-width: 250px;
-  width: 250px;
-  flex-shrink: 0;
+  /* Colonnes ÉLASTIQUES : se partagent à parts égales la largeur dispo (board pleine largeur),
+     avec un plancher lisible -> si trop étroit (beaucoup de statuts / petit écran), le board scrolle. */
+  flex: 1 1 0;
+  min-width: 230px;
   display: flex;
   flex-direction: column;
 }
