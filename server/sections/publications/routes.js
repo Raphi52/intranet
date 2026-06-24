@@ -5,6 +5,7 @@
  */
 
 import { Router } from 'express';
+import { notifierTous } from '../../core/notifications.js';
 
 import {
   creerPublication,
@@ -34,6 +35,7 @@ router.post('/', (req, res) => {
   const { titre, corps } = req.body || {};
   if (!titre?.trim()) return res.status(400).json({ erreur: 'Le titre est requis.' });
   const pub = creerPublication({ titre, corps }, req.user);
+  if (pub) notifierTous({ type: 'publication', message: `Nouvelle publication : ${pub.titre}` }, req.user.id);
   return pub ? res.status(201).json(pub) : res.status(400).json({ erreur: 'Titre invalide.' });
 });
 

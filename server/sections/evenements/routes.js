@@ -5,6 +5,7 @@
  */
 
 import { Router } from 'express';
+import { notifierTous } from '../../core/notifications.js';
 
 import {
   creerEvent,
@@ -36,6 +37,7 @@ router.post('/', (req, res) => {
   if (!body.titre?.trim()) return res.status(400).json({ erreur: 'Le titre est requis.' });
   if (!body.date_event?.trim()) return res.status(400).json({ erreur: 'La date est requise.' });
   const e = creerEvent(body, req.user);
+  if (e) notifierTous({ type: 'evenement', message: `Nouvel événement : ${e.titre}` }, req.user.id);
   return e ? res.status(201).json(e) : res.status(400).json({ erreur: 'Données invalides.' });
 });
 

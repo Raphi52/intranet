@@ -80,6 +80,11 @@ async function seed() {
     const ck = await cookieDe(email);
     await fetch(`${BASE}/api/evenements/${evt.id}/participation`, { method: 'POST', headers: { Cookie: ck } });
   }
+  // Notifs : Paul publie + crée un événement → l'admin (capturé) reçoit des notifs (badge cloche).
+  const ckPaul = await cookieDe('paul@amitel.fr');
+  const postAs = (u, b, c) => fetch(BASE + u, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: c }, body: JSON.stringify(b) });
+  await postAs('/api/publications', { titre: 'Note de Paul', corps: 'Pensez à mettre à jour vos accès avant vendredi.' }, ckPaul);
+  await postAs('/api/evenements', { titre: 'Réunion équipe support', lieu: 'Salle 2', date_event: '2099-07-01 09:00' }, ckPaul);
   return proj.id;
 }
 
@@ -184,6 +189,17 @@ try {
   const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');
   const okAccueil = await capturerHash('#/', 'accueil', '.pub', true);
 
+  // Cloche : ouvrir le panneau de notifications (l'admin a des notifs de Paul) et capturer.
+  await envoyer('Runtime.evaluate', { expression: `document.getElementById('cloche-btn')?.click()`, returnByValue: true }, session);
+  await wait(350);
+  const clocheR = await envoyer('Runtime.evaluate', { expression: `!!document.getElementById('cloche-panneau')`, returnByValue: true }, session);
+  const okCloche = !!clocheR.result?.value;
+  const shotCloche = await envoyer('Page.captureScreenshot', { format: 'png' }, session);
+  writeFileSync(join(OUT, 'cloche.png'), Buffer.from(shotCloche.data, 'base64'));
+  console.log(`  capture: cloche.png (panneau=${okCloche})`);
+  await envoyer('Runtime.evaluate', { expression: `document.body.click()`, returnByValue: true }, session);
+  await wait(150);
+
   // DARK MODE : on active le thème sombre et on recapture 2 vues.
   await envoyer('Runtime.evaluate', { expression: `document.body.classList.add('sombre')`, returnByValue: true }, session);
   await wait(200);
@@ -192,7 +208,7 @@ try {
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okBoardDark && okAccueilDark && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okCloche && okBoardDark && okAccueilDark && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);

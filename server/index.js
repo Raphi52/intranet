@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path';
 // pour que le ticketing puisse référencer users(id) dès sa propre création de tables.
 import { middlewareSession, exigerAuth, amorcerAdmin } from './core/auth.js';
 import authRoutes from './core/auth-routes.js';
+import notifRoutes from './core/notif-routes.js';
 import { enregistrerSections } from './sections/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,6 +49,9 @@ app.use('/api/auth', authRoutes);
 // Garde : toute autre route /api exige une session valide → 401 sinon (anti-usurpation).
 // Les statiques + le shell SPA restent publics (le front affiche l'écran de login).
 app.use('/api', exigerAuth);
+
+// Notifications (core, derrière la garde) — cloche du portail.
+app.use('/api/notifications', notifRoutes);
 
 // --- Sections du portail (montées dynamiquement, derrière la garde) -------
 enregistrerSections(app);

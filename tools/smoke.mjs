@@ -393,6 +393,35 @@ try {
     const evDelAdmin = await f(`/api/evenements/${ev.id}`, { method: 'DELETE' });
     evDelAdmin.status === 204 ? ok('événements: admin supprime n\'importe lequel (204, cascade participants)') : ko(`événements: suppression admin (status ${evDelAdmin.status})`);
 
+    // j) Cloche de notifications : publi/event diffusés (sauf auteur), ticket→assigné, scopé + mark-read
+    const naAvant = (await jget('/api/notifications', cAgent)).body?.nonLus ?? 0;
+    await f('/api/publications', { method: 'POST', body: { titre: 'Notif pub test', corps: 'x' } }); // admin publie
+    const naPub = await jget('/api/notifications', cAgent);
+    naPub.status === 200 && naPub.body.nonLus > naAvant && naPub.body.items.some((n) => n.type === 'publication' && n.message.includes('Notif pub test'))
+      ? ok('notifs: nouvelle publication → diffusée aux autres (cloche)')
+      : ko(`notifs: publication non diffusée (nonLus ${naAvant}->${naPub.body?.nonLus})`);
+    const naAdmin = await jget('/api/notifications');
+    !naAdmin.body.items.some((n) => n.type === 'publication' && n.message.includes('Notif pub test'))
+      ? ok('notifs: l\'auteur n\'est PAS notifié de sa propre publication')
+      : ko('notifs: auteur notifié de sa propre action (exclusion KO)');
+    await f('/api/evenements', { method: 'POST', body: { titre: 'Notif event test', date_event: '2099-09-09 10:00' } });
+    const naEv = await jget('/api/notifications', cAgent);
+    naEv.body.items.some((n) => n.type === 'evenement' && n.message.includes('Notif event test'))
+      ? ok('notifs: nouvel événement → diffusé (cloche)')
+      : ko('notifs: événement non diffusé');
+    naEv.body.items.some((n) => n.type === 'assignation')
+      ? ok('notifs: ticket assigné présent dans la cloche unifiée')
+      : ko('notifs: notif d\'assignation ticket absente de la cloche');
+    const luTout = await f('/api/notifications/lu', { method: 'POST', cookie: cAgent, body: {} }).then((r) => r.json());
+    const naApres = await jget('/api/notifications', cAgent);
+    luTout?.nonLus === 0 && naApres.body.nonLus === 0
+      ? ok('notifs: « tout marquer lu » → compteur à 0')
+      : ko(`notifs: mark-read KO (nonLus ${luTout?.nonLus})`);
+    const naAutre = await jget('/api/notifications', cAutre);
+    naAutre.body.nonLus > 0
+      ? ok('notifs: isolation — mark-read d\'un user n\'affecte pas un autre')
+      : ko('notifs: isolation mark-read cross-user KO');
+
     // g) Durcissement : throttle anti-brute-force sur le login (en dernier — neutralise l'IP après coup)
     let throttle429 = false;
     for (let i = 0; i < 12; i++) {

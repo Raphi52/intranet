@@ -11,6 +11,7 @@ import { sections } from '../sections/index.js';
 import { renduAccueil } from './home.js';
 import { toast, echappe } from './ui.js';
 import { chargerMoi, moiCourant, connexion, deconnexion, badgeOperateur, estAdmin } from './identite.js';
+import { rafraichirCloche, demarrerCloche } from './cloche.js';
 
 const app = document.getElementById('app');
 const parId = Object.fromEntries(sections.map((s) => [s.id, s]));
@@ -131,6 +132,7 @@ async function routeur() {
     return;
   }
   afficherBadge();
+  rafraichirCloche();
 
   app.innerHTML = '<div class="chargement">Chargement…</div>';
 
@@ -193,6 +195,7 @@ async function demarrer() {
   appliquerTheme(); // applique le thème mémorisé au plus tôt
   await chargerMoi(); // récupère la session existante (cookie) au chargement
   brancherCote();
+  demarrerCloche(); // cloche de notifs : fetch initial + polling léger
   window.addEventListener('hashchange', routeur);
   // Session expirée détectée par un appel API → on recharge l'identité et réaffiche.
   window.addEventListener('portail:401', async () => {
