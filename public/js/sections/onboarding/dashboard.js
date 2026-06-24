@@ -103,11 +103,11 @@ function formulaireCreation() {
         <div class="champs" style="padding-top:0">
           <div class="champ">
             <label for="f-prenom">Prénom</label>
-            <input id="f-prenom" name="prenom" autocomplete="off" />
+            <input id="f-prenom" name="prenom" maxlength="25" autocomplete="off" />
           </div>
           <div class="champ">
             <label for="f-nom">Nom</label>
-            <input id="f-nom" name="nom" autocomplete="off" />
+            <input id="f-nom" name="nom" maxlength="25" autocomplete="off" />
           </div>
           <div class="champ">
             <label for="f-service">Service</label>

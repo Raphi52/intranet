@@ -101,9 +101,9 @@ function sectionIdentite() {
         <!-- fix-ok: a11y (audit judge ## FRONT) — labels liés for/id, cause connue, fix indépendant non aveugle -->
         <div class="champs">
           <div class="champ"><label for="fi-prenom">Prénom</label>
-            <input id="fi-prenom" data-identite="prenom" value="${echappe(fiche.prenom)}" /></div>
+            <input id="fi-prenom" data-identite="prenom" maxlength="25" value="${echappe(fiche.prenom)}" /></div>
           <div class="champ"><label for="fi-nom">Nom</label>
-            <input id="fi-nom" data-identite="nom" value="${echappe(fiche.nom)}" /></div>
+            <input id="fi-nom" data-identite="nom" maxlength="25" value="${echappe(fiche.nom)}" /></div>
           <div class="champ"><label for="fi-service">Service</label>
             <select id="fi-service" data-identite="service">${opts(meta.services, fiche.service)}</select></div>
           <div class="champ"><label for="fi-poste">Intitulé du poste</label>

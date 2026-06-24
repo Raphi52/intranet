@@ -207,12 +207,12 @@ try {
     const bad = await f('/api/onboarding/collaborateurs', { method: 'POST', body: { prenom: 'X', service: 'PasUnService' } });
     bad.status === 400 ? ok('fix #7 : POST avec service hors liste rejeté (400)') : ko(`fix #7 : 400 attendu, reçu ${bad.status}`);
 
-    // #1 : input nom nettoyé (retours de ligne/contrôle retirés, plafonné) — ne casse pas les cards
-    const sale = await f('/api/onboarding/collaborateurs', { method: 'POST', body: { prenom: 'Inj', nom: 'A'.repeat(300) + '\nLigne2\tTab' } });
+    // #1 : input nom/prénom nettoyé (retours de ligne/contrôle retirés) + plafonné à 25 — ne casse pas les cards
+    const sale = await f('/api/onboarding/collaborateurs', { method: 'POST', body: { prenom: 'P'.repeat(40), nom: 'A'.repeat(300) + '\nLigne2\tTab' } });
     const saleJ = await sale.json().catch(() => null);
-    sale.status === 201 && saleJ && !/[\r\n\t]/.test(saleJ.nom) && saleJ.nom.length <= 120
-      ? ok('onboarding #1 : nom nettoyé (sans saut de ligne, plafonné ≤120)')
-      : ko(`onboarding #1 : input non nettoyé (len=${saleJ?.nom?.length}, ctrl=${/[\r\n\t]/.test(saleJ?.nom || '')})`);
+    sale.status === 201 && saleJ && !/[\r\n\t]/.test(saleJ.nom) && saleJ.nom.length === 25 && saleJ.prenom.length === 25
+      ? ok('onboarding #1 : nom + prénom nettoyés (sans saut de ligne) et plafonnés à 25')
+      : ko(`onboarding #1 : cap nom/prénom KO (nom=${saleJ?.nom?.length}, prenom=${saleJ?.prenom?.length}, ctrl=${/[\r\n\t]/.test(saleJ?.nom || '')})`);
     if (saleJ?.id) await f(`/api/onboarding/collaborateurs/${saleJ.id}`, { method: 'DELETE' });
 
     const liste = await jget('/api/onboarding/collaborateurs');

@@ -158,20 +158,23 @@ const CHAMPS_IDENTITE = [
 
 // Longueur max d'un champ d'identité (garde-fou anti-abus / casse de l'UI / grossissement de la base).
 const MAX_CHAMP = 120;
+// Nom + prénom : plafond court (25) — garde court le rendu des cards / du hero.
+const MAX_NOM = 25;
+const MAX_PAR_CHAMP = { nom: MAX_NOM, prenom: MAX_NOM };
 
 // Nettoie un champ d'identité : retire retours de ligne + caractères de contrôle (qui cassent
 // le rendu des cards), réduit les espaces multiples, plafonne la longueur.
-function nettoyerChamp(v) {
+function nettoyerChamp(v, max = MAX_CHAMP) {
   return String(v ?? '')
     .replace(/[\u0000-\u001F\u007F]/g, ' ') // \n \r \t + caractères de contrôle -> espace
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, MAX_CHAMP);
+    .slice(0, max);
 }
 
 function normaliseIdentite(data = {}) {
   const out = {};
-  for (const champ of CHAMPS_IDENTITE) out[champ] = nettoyerChamp(data[champ]);
+  for (const champ of CHAMPS_IDENTITE) out[champ] = nettoyerChamp(data[champ], MAX_PAR_CHAMP[champ] ?? MAX_CHAMP);
   return out;
 }
 
