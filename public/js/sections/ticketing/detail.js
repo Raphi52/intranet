@@ -68,7 +68,7 @@ function dessiner(app, t, projet) {
       </div>
       <div class="tk-actions">
         ${peutEditer ? '<button class="bouton bouton--fantome" id="btn-editer">✎ Éditer</button>' : ''}
-        <button class="bouton bouton--danger" id="btn-supprimer">Supprimer</button>
+        ${peutEditer ? '<button class="bouton bouton--danger" id="btn-supprimer">Supprimer</button>' : ''}
       </div>
     </div>
     <div class="tk-detail">
@@ -133,7 +133,7 @@ function dessiner(app, t, projet) {
     }
   });
 
-  app.querySelector('#btn-supprimer').addEventListener('click', () => {
+  app.querySelector('#btn-supprimer')?.addEventListener('click', () => {
     ouvrirModale({
       titre: 'Supprimer ce ticket ?',
       corpsHTML: `<p>Le ticket <strong>${echappe(t.cle)}</strong> et ses commentaires seront définitivement supprimés.</p>`,

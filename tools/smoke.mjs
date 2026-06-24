@@ -307,6 +307,10 @@ try {
     editTkCrea.status === 200 && editTkCreaJ?.priorite === 'haute' ? ok('ticket: le créateur édite ses champs (200)') : ko(`ticket: créateur bloqué (status ${editTkCrea.status})`);
     const editTkAdmin = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'PATCH', body: { titre: 'Corrigé par admin' } });
     editTkAdmin.status === 200 ? ok('ticket: l\'admin édite n\'importe quel ticket (200)') : ko(`ticket: admin bloqué (status ${editTkAdmin.status})`);
+    const delTkAutre = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'DELETE', cookie: cAutre });
+    delTkAutre.status === 403 ? ok('ticket: suppression par un non-créateur refusée (403)') : ko(`ticket: non-créateur a supprimé (status ${delTkAutre.status})`);
+    const delTkCrea = await f(`/api/ticketing/tickets/${tkCrea.id}`, { method: 'DELETE', cookie: cAgent });
+    delTkCrea.status === 204 ? ok('ticket: le créateur supprime son ticket (204)') : ko(`ticket: créateur ne peut supprimer (status ${delTkCrea.status})`);
 
     // f) Confidentialité RÉELLE par compte (projet privé) -------------------
     const privR = await f('/api/ticketing/projets', { method: 'POST', body: { cle: 'RH', nom: 'RH confidentiel', prive: true, membres: [agent.id] } });

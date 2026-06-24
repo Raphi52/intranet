@@ -52,6 +52,13 @@ const ticketVisibleOuStop = (id, req, res) => {
   return false;
 };
 
+// Édition / suppression d'un ticket : réservées à son créateur (par id, repli sur le badge
+// pour les tickets antérieurs à created_par_id) ou à un admin.
+const peutEditerTicket = (t, req) =>
+  req.user.role === 'admin' ||
+  (Number.isInteger(t.created_par_id) && t.created_par_id === req.user.id) ||
+  (t.created_par_id == null && !!t.created_par && t.created_par === req.operateur);
+
 const idValide = (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -177,14 +184,8 @@ router.patch('/tickets/:id', (req, res) => {
   // Édition des CHAMPS + de l'ASSIGNATION : réservée au créateur du ticket (ou à un admin).
   // Le déplacement de colonne (statut) garde sa propre règle plus bas (« je prends un ticket libre »).
   const CHAMPS_PROTEGES = ['titre', 'description', 'priorite', 'type', 'echeance', 'assignee_id'];
-  if (CHAMPS_PROTEGES.some((c) => c in body)) {
-    const estCreateur =
-      (Number.isInteger(courant.created_par_id) && courant.created_par_id === req.user.id) ||
-      // Tickets antérieurs à la colonne created_par_id : repli sur le badge d'auteur.
-      (courant.created_par_id == null && !!courant.created_par && courant.created_par === req.operateur);
-    if (!estCreateur && req.user.role !== 'admin') {
-      return res.status(403).json({ erreur: 'Seul le créateur du ticket peut modifier ses champs et son assignation.' });
-    }
+  if (CHAMPS_PROTEGES.some((c) => c in body) && !peutEditerTicket(courant, req)) {
+    return res.status(403).json({ erreur: 'Seul le créateur du ticket peut modifier ses champs et son assignation.' });
   }
 
   const data = { ...body };
@@ -211,6 +212,11 @@ router.delete('/tickets/:id', (req, res) => {
   const id = idValide(req, res);
   if (id === null) return;
   if (!ticketVisibleOuStop(id, req, res)) return;
+  const courant = getTicket(id);
+  if (!courant) return res.status(404).json({ erreur: 'Ticket introuvable' });
+  if (!peutEditerTicket(courant, req)) {
+    return res.status(403).json({ erreur: 'Seul le créateur du ticket peut le supprimer.' });
+  }
   return supprimerTicket(id) ? res.status(204).end() : res.status(404).json({ erreur: 'Ticket introuvable' });
 });
 router.post('/tickets/:id/commentaires', (req, res) => {
