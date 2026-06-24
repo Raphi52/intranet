@@ -1815,6 +1815,32 @@ body.sombre .pub.is-epingle {
 body.sombre .evt.is-passe {
   opacity: 0.5;
 }
+/* Onboarding (checklist) : cards & surfaces codées en clair → recolorées en sombre. */
+body.sombre .section__icone {
+  background: #222b37;
+}
+body.sombre .tache,
+body.sombre .demande {
+  background: #1f2733;
+  border-color: var(--bordure);
+}
+body.sombre .tache.is-done {
+  background: var(--vert-clair);
+  border-color: #225034;
+}
+body.sombre .demande.is-on {
+  background: #3a201d;
+}
+body.sombre .coche {
+  background: #161c24;
+  border-color: var(--bordure-forte);
+}
+body.sombre .barre {
+  background: #2c3543;
+}
+body.sombre .relais {
+  background: #2a1f1d;
+}
 /* Ligne du bas de la sidebar : Déconnexion + bascule de thème côte à côte. */
 .cote__bas {
   display: flex;

@@ -209,6 +209,12 @@ try {
   const okBoardDark = await capturerHash(`#/ticketing/p/${projId}`, 'board-dark', '.tk-board');
   const okAccueilDark = await capturerHash('#/', 'accueil-dark', '.pub', true);
 
+  // Onboarding (checklist) en SOMBRE : les cards (.tache/.demande) ne doivent plus être blanches.
+  const okOnbDark = await capturerHash('#/onboarding/c/1', 'onboarding-dark', '.section', true);
+  // Preuve hors-modèle que le cap nom/prénom (maxlength=25) est bien dans le HTML SERVI.
+  const capR = await envoyer('Runtime.evaluate', { expression: `(function(){var n=document.getElementById('fi-nom'),p=document.getElementById('fi-prenom');return (n&&p)?('nom='+n.maxLength+',prenom='+p.maxLength):'inputs-absents';})()`, returnByValue: true }, session);
+  console.log('  cap nom/prénom (maxlength servi):', capR.result?.value);
+
   // Détail d'un ticket vu par un NON-créateur (Paul : assigné mais pas l'auteur) → édition masquée.
   await envoyer('Runtime.evaluate', { expression: `document.getElementById('op-deconnexion')?.click()`, returnByValue: true }, session);
   for (let i = 0; i < 40; i++) { const r = await envoyer('Runtime.evaluate', { expression: `!!document.getElementById('login-form')`, returnByValue: true }, session); if (r.result?.value) break; await wait(150); }
@@ -218,7 +224,7 @@ try {
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okCloche && okDetail && okBoardDark && okAccueilDark && okDetailPaul && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okCloche && okDetail && okBoardDark && okAccueilDark && okOnbDark && okDetailPaul && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);
