@@ -155,6 +155,29 @@ Claude suivra exactement les étapes de ce guide.
 
 ---
 
+## 🔁 Déploiement automatisé (CI/CD Azure DevOps)
+
+Le dépôt fournit un pipeline **`azure-pipelines.yml`** (3 stages) :
+
+1. **Build & tests** — `npm ci` (compile better-sqlite3) + `npm run smoke` (parcours HTTP).
+   *(Pas de build front : SPA vanilla servie par Express.)*
+2. **Image → ACR** — build de l'image Docker (Dockerfile multi-stage) + push vers l'**Azure Container Registry**.
+3. **Déploiement** — connexion **SSH** au serveur, qui **tire l'image depuis l'ACR** et (re)démarre
+   via **`docker-compose.prod.yml`** — le serveur n'a **pas les sources**, seulement l'image + le compose.
+
+**Côté serveur (une fois)** : Docker installé + un dossier de déploiement. Le pipeline y dépose
+`docker-compose.prod.yml` et un `.env` (généré depuis les secrets) à chaque déploiement.
+
+**À configurer dans Azure DevOps** (détaillé en tête de `azure-pipelines.yml`) :
+- une **service connection** « Docker Registry » vers l'ACR (`dockerRegistryServiceConnection`) ;
+- variables : `acrLoginServer`, `deployHost`, `deployUser`, `deployDir`, `hostPort` ;
+- **secrets** : `sshPrivateKey`, `acrUsername`, `acrPassword`, `adminEmail`, `adminPassword`.
+
+Le conteneur tourne dans le **projet Docker `portail-amitel`** (regroupé et isolé des autres projets).
+
+> Le mode manuel (§2, `docker compose up -d --build` depuis les sources) reste valable pour un test
+> local ou un déploiement ponctuel sans CI/CD.
+
 ## Récapitulatif technique
 
 | Élément | Valeur |

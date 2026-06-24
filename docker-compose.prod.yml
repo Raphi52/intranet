@@ -1,0 +1,50 @@
+# =============================================================================
+# Portail Amitel — Compose de PRODUCTION (serveur de déploiement).
+#
+# Le serveur ne build PAS : il TIRE l'image depuis le registre (ACR) et la lance.
+# L'image complète est référencée par PORTAIL_IMAGE (ex: monacr.azurecr.io/portail-amitel:latest).
+#
+#   export PORTAIL_IMAGE=<acr>.azurecr.io/portail-amitel:latest
+#   docker compose -p portail-amitel -f docker-compose.prod.yml pull
+#   docker compose -p portail-amitel -f docker-compose.prod.yml up -d
+#
+# `name: portail-amitel` regroupe le(s) conteneur(s) sous un PROJET Docker dédié
+# (onglet Containers de Docker Desktop / `docker compose ls`), distinct des autres
+# projets du serveur.
+# =============================================================================
+
+name: portail-amitel
+
+services:
+  portail:
+    image: ${PORTAIL_IMAGE:-portail-amitel:latest}
+    container_name: portail-amitel
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      PORTAIL_DB: /app/data/onboarding.db
+      # Compte admin amorcé au 1er démarrage (depuis l'environnement / secrets).
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # La base SQLite (onboarding.db + WAL) persiste dans ce volume nommé.
+      - portail-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode<400?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  portail-data:

@@ -1,0 +1,132 @@
+# =============================================================================
+# Portail Amitel — Pipeline CI/CD Azure DevOps
+#
+# Flux :
+#   1) Build & tests   : npm ci (compile better-sqlite3) + npm run smoke (parcours HTTP).
+#   2) Image -> ACR    : build de l'image Docker (Dockerfile multi-stage) + push vers l'ACR.
+#   3) Déploiement     : SSH sur le serveur cible -> docker login ACR -> compose pull + up
+#                        (le serveur ne reçoit QUE l'image + le compose de prod, pas les sources).
+#
+# -----------------------------------------------------------------------------
+# À CONFIGURER côté Azure DevOps AVANT le premier run (Pipelines > Edit > Variables,
+# ou une Variable group ; cocher « secret » pour les sensibles) :
+#
+#   Service connection (Project Settings > Service connections) :
+#     - dockerRegistryServiceConnection : connexion « Docker Registry » de type Azure Container Registry
+#       (pointant sur votre ACR). Son nom est repris dans la variable ci-dessous.
+#
+#   Variables :
+#     - acrLoginServer   : login server de l'ACR (ex. monregistre.azurecr.io)        [non secret]
+#     - deployHost       : hôte/IP du serveur de déploiement                          [non secret]
+#     - deployUser       : utilisateur SSH                                            [non secret]
+#     - deployDir        : dossier sur le serveur où vit docker-compose.prod.yml      [non secret]
+#     - hostPort         : port publié sur le serveur (défaut 8080)                   [non secret]
+#   Secrets :
+#     - sshPrivateKey    : clé privée SSH d'accès au serveur                          [SECRET]
+#     - acrUsername      : identifiant de pull ACR (ou token)                         [SECRET]
+#     - acrPassword      : mot de passe / token de pull ACR                           [SECRET]
+#     - adminEmail       : e-mail de l'admin amorcé au 1er démarrage                  [SECRET ou var]
+#     - adminPassword    : mot de passe de l'admin amorcé                             [SECRET]
+#
+# (Vous m'avez dit fournir nom serveur + clé SSH : ils alimentent deployHost / sshPrivateKey.)
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  vmImageName: 'ubuntu-latest'
+  imageRepository: 'portail-amitel'
+  # Nom de la service connection Docker Registry (ACR) créée dans Project Settings.
+  dockerRegistryServiceConnection: 'acr-portail'
+  # Tag de l'image : numéro de build (traçable) ; on pousse aussi 'latest'.
+  tag: '$(Build.BuildId)'
+
+stages:
+  # ---------------------------------------------------------------------------
+  - stage: Build
+    displayName: 'Build & tests'
+    jobs:
+      - job: build_test
+        displayName: 'npm ci + smoke'
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: NodeTool@0
+            displayName: 'Node.js 20'
+            inputs:
+              versionSpec: '20.x'
+          - script: npm ci
+            displayName: 'Install (npm ci — compile better-sqlite3)'
+          # Pas de build front : SPA vanilla servie par Express (aucun `npm run build`).
+          - script: npm run smoke
+            displayName: 'Tests (smoke : parcours HTTP de bout en bout derrière l auth)'
+
+  # ---------------------------------------------------------------------------
+  - stage: Image
+    displayName: 'Image Docker -> ACR'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: docker_build_push
+        displayName: 'Build & push image'
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: Docker@2
+            displayName: 'Build & push (Dockerfile multi-stage)'
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: 'Dockerfile'
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+
+  # ---------------------------------------------------------------------------
+  - stage: Deploy
+    displayName: 'Déploiement serveur (pull depuis ACR)'
+    dependsOn: Image
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: deploy_ssh
+        displayName: 'SSH -> compose pull + up'
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: self # pour récupérer docker-compose.prod.yml et l'envoyer au serveur
+          - script: |
+              set -euo pipefail
+              # 1) Clé SSH (secret) -> fichier temporaire
+              install -m 700 -d "$HOME/.ssh"
+              printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+              chmod 600 "$HOME/.ssh/deploy_key"
+              SSHOPTS="-i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
+
+              # 2) Générer le .env du serveur depuis les secrets (printf = sûr, pas de souci de quoting).
+              #    Les secrets restent dans un FICHIER (jamais sur la ligne de commande SSH).
+              printf 'PORTAIL_IMAGE=%s\nHOST_PORT=%s\nADMIN_EMAIL=%s\nADMIN_PASSWORD=%s\nTZ=%s\nACR_LOGIN_SERVER=%s\nACR_USERNAME=%s\nACR_PASSWORD=%s\n' \
+                "$ACR_LOGIN_SERVER/portail-amitel:latest" "$HOST_PORT" "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "Europe/Paris" \
+                "$ACR_LOGIN_SERVER" "$ACR_USERNAME" "$ACR_PASSWORD" > env.deploy
+
+              # 3) Envoyer le compose de PROD + le .env (le serveur n'a PAS les sources)
+              scp $SSHOPTS docker-compose.prod.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.prod.yml"
+              scp $SSHOPTS env.deploy "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/.env"
+
+              # 4) Sur le serveur : login ACR (creds lus depuis .env) -> pull -> up (projet 'portail-amitel')
+              ssh $SSHOPTS "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_DIR' && set -a && . ./.env && set +a && printf '%s' \"\$ACR_PASSWORD\" | docker login \"\$ACR_LOGIN_SERVER\" -u \"\$ACR_USERNAME\" --password-stdin && docker compose -p portail-amitel --env-file .env -f docker-compose.prod.yml pull && docker compose -p portail-amitel --env-file .env -f docker-compose.prod.yml up -d && docker compose -p portail-amitel -f docker-compose.prod.yml ps"
+            displayName: 'Déploiement par SSH'
+            env:
+              SSH_PRIVATE_KEY: $(sshPrivateKey)
+              DEPLOY_HOST: $(deployHost)
+              DEPLOY_USER: $(deployUser)
+              DEPLOY_DIR: $(deployDir)
+              HOST_PORT: $(hostPort)
+              ACR_LOGIN_SERVER: $(acrLoginServer)
+              ACR_USERNAME: $(acrUsername)
+              ACR_PASSWORD: $(acrPassword)
+              ADMIN_EMAIL: $(adminEmail)
+              ADMIN_PASSWORD: $(adminPassword)
