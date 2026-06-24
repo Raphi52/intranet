@@ -11,8 +11,9 @@
 import onboarding from './onboarding/index.js';
 import docs from './docs/index.js';
 import ticketing from './ticketing/index.js';
+import publications from './publications/index.js';
 
-export const sections = [onboarding, docs, ticketing];
+export const sections = [onboarding, docs, ticketing, publications];
 
 /** Monte toutes les sections sur l'app Express. */
 export function enregistrerSections(app) {

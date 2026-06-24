@@ -343,6 +343,34 @@ try {
     const delTk = await f(`/api/ticketing/tickets/${tk.id}`, { method: 'DELETE' });
     delTk.status === 204 ? ok('ticketing: suppression ticket (204, cascade)') : ko(`ticketing: suppression (status ${delTk.status})`);
 
+    // h) Publications (mur d'accueil) : création (connecté) / édition+suppression (auteur+admin) / épinglage (admin)
+    const pubR = await f('/api/publications', { method: 'POST', cookie: cAgent, body: { titre: 'Annonce test', corps: 'Ligne 1\nLigne 2' } });
+    const pub = await pubR.json().catch(() => null);
+    pubR.status === 201 && pub?.id && pub.titre === 'Annonce test' && pub.auteur_nom
+      ? ok('publications: création par un connecté (titre+corps+auteur signé)')
+      : ko(`publications: création (status ${pubR.status})`);
+    const listePub = await jget('/api/publications');
+    Array.isArray(listePub.body) && listePub.body.some((p) => p.id === pub.id)
+      ? ok('publications: présente dans la liste') : ko('publications: absente de la liste');
+    const editAuteur = await f(`/api/publications/${pub.id}`, { method: 'PUT', cookie: cAgent, body: { titre: 'Annonce éditée' } });
+    editAuteur.status === 200 ? ok('publications: l\'auteur édite la sienne') : ko(`publications: édition auteur (status ${editAuteur.status})`);
+    const editAutre = await f(`/api/publications/${pub.id}`, { method: 'PUT', cookie: cAutre, body: { titre: 'pirate' } });
+    const delAutre = await f(`/api/publications/${pub.id}`, { method: 'DELETE', cookie: cAutre });
+    editAutre.status === 403 && delAutre.status === 403
+      ? ok('publications: un autre (non-admin) ne peut ni éditer ni supprimer (403)')
+      : ko(`publications: protection auteur (edit=${editAutre.status}, del=${delAutre.status})`);
+    const pinAutre = await f(`/api/publications/${pub.id}/epingle`, { method: 'PATCH', cookie: cAutre, body: { epingle: true } });
+    pinAutre.status === 403 ? ok('publications: épinglage refusé au non-admin (403)') : ko(`publications: épinglage non-admin (status ${pinAutre.status})`);
+    await f('/api/publications', { method: 'POST', body: { titre: 'Autre annonce' } }); // 2e (non épinglée) pour le tri
+    const pinAdmin = await f(`/api/publications/${pub.id}/epingle`, { method: 'PATCH', body: { epingle: true } });
+    const pinJson = await pinAdmin.json().catch(() => null);
+    const listePub2 = await jget('/api/publications');
+    pinAdmin.status === 200 && pinJson?.epingle === true && listePub2.body?.[0]?.id === pub.id
+      ? ok('publications: admin épingle → remonte en tête du fil')
+      : ko(`publications: épinglage admin/tri (status ${pinAdmin.status}, top=${listePub2.body?.[0]?.id})`);
+    const delAdmin = await f(`/api/publications/${pub.id}`, { method: 'DELETE' });
+    delAdmin.status === 204 ? ok('publications: admin supprime n\'importe laquelle (204)') : ko(`publications: suppression admin (status ${delAdmin.status})`);
+
     // g) Durcissement : throttle anti-brute-force sur le login (en dernier — neutralise l'IP après coup)
     let throttle429 = false;
     for (let i = 0; i < 12; i++) {

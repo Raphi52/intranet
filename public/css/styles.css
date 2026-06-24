@@ -1454,3 +1454,81 @@ a {
     position: static;
   }
 }
+
+/* ============================== PUBLICATIONS (accueil) ==================== */
+.fil-pub {
+  margin-top: 36px;
+}
+.fil-pub__titre {
+  font-size: 1.2rem;
+  margin: 0 0 14px;
+}
+.pub-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 14px;
+  margin-bottom: 18px;
+  box-shadow: var(--ombre);
+}
+.pub-form input,
+.pub-form textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--bordure-forte);
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+.pub-form input {
+  font-weight: 600;
+}
+.pub-form .bouton {
+  align-self: flex-end;
+}
+.pub-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pub {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-sm);
+  padding: 14px 16px;
+  box-shadow: var(--ombre);
+}
+.pub.is-epingle {
+  border-color: var(--ambre);
+  background: #fffdf6;
+}
+.pub__tete {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.pub__titre {
+  margin: 0;
+  font-size: 1.02rem;
+  overflow-wrap: anywhere;
+}
+.pub__actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.pub__corps {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--gris-2);
+}
+.pub__meta {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--gris-3);
+}

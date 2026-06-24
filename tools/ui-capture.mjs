@@ -65,6 +65,10 @@ async function seed() {
   await patch(`/api/ticketing/tickets/${t2.id}`, { statut: 'en_attente' });
   // Onboarding : une fiche à nom TRÈS long pour vérifier la troncature (ellipsis) des cards.
   await post('/api/onboarding/collaborateurs', { prenom: 'Jean-Baptiste', nom: 'De La Tour Du Pin Chambly Montmorency Laval De La Roche Aymon Très Long', intitule_poste: 'Responsable adjoint du pôle exploitation et coordination inter-services régionaux' });
+  // Publications (mur d'accueil) — une épinglée + une normale.
+  const annonce = await post('/api/publications', { titre: 'Bienvenue sur le nouveau portail', corps: 'Le portail Amitel s\'enrichit : onboarding, tickets, comptes et désormais ce mur de publications. Bonne navigation !' });
+  await patch(`/api/publications/${annonce.id}/epingle`, { epingle: true });
+  await post('/api/publications', { titre: 'Maintenance vendredi 18h', corps: 'Une courte interruption de service est prévue vendredi en fin de journée.' });
   return proj.id;
 }
 
@@ -126,7 +130,7 @@ try {
   await envoyer('Runtime.enable', {}, session);
 
   // Capture par CHANGEMENT DE HASH (sans reload) — garde la session SPA vivante après login.
-  async function capturerHash(hash, nom, selecteur) {
+  async function capturerHash(hash, nom, selecteur, pleinePage = false) {
     await envoyer('Runtime.evaluate', { expression: `location.hash=${JSON.stringify(hash)}`, returnByValue: true }, session);
     const t0 = Date.now();
     let pret = false;
@@ -136,7 +140,7 @@ try {
       await wait(150);
     }
     await wait(300);
-    const shot = await envoyer('Page.captureScreenshot', { format: 'png' }, session);
+    const shot = await envoyer('Page.captureScreenshot', { format: 'png', captureBeyondViewport: pleinePage }, session);
     writeFileSync(join(OUT, nom + '.png'), Buffer.from(shot.data, 'base64'));
     console.log(`  capture: ${nom}.png (rendu=${pret})`);
     return pret;
@@ -163,7 +167,7 @@ try {
   const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board');
   const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
   const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');
-  const okAccueil = await capturerHash('#/', 'accueil', '.grille-sections, .grille, .vide');
+  const okAccueil = await capturerHash('#/', 'accueil', '.pub', true);
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
