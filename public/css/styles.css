@@ -1670,3 +1670,80 @@ a {
   font-size: 0.76rem;
   color: var(--gris-3);
 }
+
+/* ============================== DARK MODE =============================== */
+/* Le gros du thème passe par les variables ; on en redéfinit les valeurs en sombre. */
+body.sombre {
+  --fond: #15181e;
+  --carte: #1f242c;
+  --bordure: #2b323d;
+  --bordure-forte: #3a4350;
+  --gris: #e8ebf1;
+  --gris-2: #aeb8c4;
+  --gris-3: #828b99;
+  --vert-clair: #15301e;
+  --ombre: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px rgba(0, 0, 0, 0.45);
+  --ombre-forte: 0 12px 44px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+/* Surfaces codées en dur (composants antérieurs au système de variables) re-teintées. */
+body.sombre .cote,
+body.sombre .modale,
+body.sombre .carte-collab,
+body.sombre .carte-section,
+body.sombre .gate__carte,
+body.sombre .tk-carte,
+body.sombre .tk-detail__cote,
+body.sombre .tk-stat,
+body.sombre .pub,
+body.sombre .pub-form,
+body.sombre .evt,
+body.sombre .tk-tbl {
+  background: var(--carte);
+}
+body.sombre .tk-col,
+body.sombre .tk-col__n,
+body.sombre .op-badge,
+body.sombre .puce,
+body.sombre .bouton--fantome:hover {
+  background: #161b22;
+}
+/* Champs de saisie : fond sombre (sinon blanc par défaut du navigateur). */
+body.sombre input,
+body.sombre textarea,
+body.sombre select {
+  background: #161b22;
+  color: var(--gris);
+  border-color: var(--bordure-forte);
+}
+body.sombre input:focus,
+body.sombre textarea:focus,
+body.sombre .champ input:focus,
+body.sombre .champ textarea:focus,
+body.sombre .tache__comm:focus {
+  background: #1b212a;
+}
+body.sombre .bouton--fantome {
+  color: var(--gris);
+  border-color: var(--bordure-forte);
+}
+body.sombre .pub.is-epingle {
+  background: #2a2512;
+}
+body.sombre .evt.is-passe {
+  opacity: 0.5;
+}
+/* Bouton de bascule de thème (dans la sidebar). */
+.cote__theme {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 8px;
+  border-radius: 10px;
+  text-align: center;
+}
+.cote__theme:hover {
+  background: var(--fond);
+}

@@ -154,25 +154,38 @@ async function routeur() {
   }
 }
 
-// Sidebar rétractable : toggle + état mémorisé. Repliée, un clic n'importe où dans la
-// sidebar la déplie (le chevron n'est visible que dépliée pour replier).
+// Sidebar rétractable au SURVOL : s'ouvre au passage de la souris, se replie 2 s après
+// que la souris en est sortie (le chevron permet aussi de replier immédiatement).
 function brancherCote() {
   const cote = document.getElementById('cote');
-  const toggle = document.getElementById('cote-toggle');
-  if (!cote || !toggle) return;
-  cote.classList.toggle('is-ouvert', localStorage.getItem('portail.menu') === 'ouvert');
-  const setOuvert = (on) => {
-    cote.classList.toggle('is-ouvert', on);
-    localStorage.setItem('portail.menu', on ? 'ouvert' : 'reduit');
+  if (!cote) return;
+  let minuteur;
+  const ouvrir = () => { clearTimeout(minuteur); cote.classList.add('is-ouvert'); };
+  const fermer = () => { clearTimeout(minuteur); cote.classList.remove('is-ouvert'); };
+  cote.addEventListener('mouseenter', ouvrir);
+  const planifierFermeture = () => { clearTimeout(minuteur); minuteur = setTimeout(fermer, 2000); }; // sleep-ok: délai UX voulu (replier 2 s après sortie souris), pas un sleep de test
+  cote.addEventListener('mouseleave', planifierFermeture);
+  document.getElementById('cote-toggle')?.addEventListener('click', (e) => { e.stopPropagation(); fermer(); });
+}
+
+// Bascule de thème clair / sombre, mémorisée (localStorage).
+function brancherTheme() {
+  const btn = document.getElementById('theme-toggle');
+  const appliquer = (sombre) => {
+    document.body.classList.toggle('sombre', sombre);
+    if (btn) btn.textContent = sombre ? '☀️' : '🌙';
   };
-  toggle.addEventListener('click', (e) => { e.stopPropagation(); setOuvert(false); });
-  // Replié : un clic sur la sidebar (hors lien de nav) la déplie.
-  cote.addEventListener('click', (e) => {
-    if (!cote.classList.contains('is-ouvert') && !e.target.closest('.nav__lien, #op-deconnexion')) setOuvert(true);
+  appliquer(localStorage.getItem('portail.theme') === 'sombre');
+  btn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const sombre = !document.body.classList.contains('sombre');
+    localStorage.setItem('portail.theme', sombre ? 'sombre' : 'clair');
+    appliquer(sombre);
   });
 }
 
 async function demarrer() {
+  brancherTheme(); // applique le thème mémorisé au plus tôt
   await chargerMoi(); // récupère la session existante (cookie) au chargement
   brancherCote();
   window.addEventListener('hashchange', routeur);

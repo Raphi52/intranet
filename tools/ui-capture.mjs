@@ -176,17 +176,23 @@ try {
 
   // 3) Vues connectées (navigation par hash, sans reload)
   const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board'); // sidebar repliée
-  // Déplie la sidebar (clic) pour capturer l'état étendu sur les vues suivantes.
-  await envoyer('Runtime.evaluate', { expression: `document.getElementById('cote').click()`, returnByValue: true }, session);
+  // Déplie la sidebar (la classe, car l'ouverture est au survol) pour les vues suivantes.
+  await envoyer('Runtime.evaluate', { expression: `document.getElementById('cote').classList.add('is-ouvert')`, returnByValue: true }, session);
   await wait(250);
   const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
   const okEvt = await capturerHash('#/evenements/', 'evenements', '.evt-liste');
   const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');
   const okAccueil = await capturerHash('#/', 'accueil', '.pub', true);
 
+  // DARK MODE : on active le thème sombre et on recapture 2 vues.
+  await envoyer('Runtime.evaluate', { expression: `document.body.classList.add('sombre')`, returnByValue: true }, session);
+  await wait(200);
+  const okBoardDark = await capturerHash(`#/ticketing/p/${projId}`, 'board-dark', '.tk-board');
+  const okAccueilDark = await capturerHash('#/', 'accueil-dark', '.pub', true);
+
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okBoardDark && okAccueilDark && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);
