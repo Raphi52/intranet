@@ -9,6 +9,7 @@
 import onboarding from './onboarding/manifest.js';
 import docs from './docs/manifest.js';
 import ticketing from './ticketing/manifest.js';
+import evenements from './evenements/manifest.js';
 import admin from './admin/manifest.js';
 
-export const sections = [onboarding, docs, ticketing, admin];
+export const sections = [onboarding, docs, ticketing, evenements, admin];

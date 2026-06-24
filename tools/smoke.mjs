@@ -371,6 +371,28 @@ try {
     const delAdmin = await f(`/api/publications/${pub.id}`, { method: 'DELETE' });
     delAdmin.status === 204 ? ok('publications: admin supprime n\'importe laquelle (204)') : ko(`publications: suppression admin (status ${delAdmin.status})`);
 
+    // i) Événements : création (connecté) / inscription-désinscription (compteur) / liste noms / perms
+    const evR = await f('/api/evenements', { method: 'POST', cookie: cAgent, body: { titre: 'Réunion équipe', lieu: 'Salle A', date_event: '2099-09-01 14:00', description: 'Point trimestriel' } });
+    const ev = await evR.json().catch(() => null);
+    evR.status === 201 && ev?.id && ev.nb_participants === 0
+      ? ok('événements: création par un connecté (0 participant)') : ko(`événements: création (status ${evR.status})`);
+    const inscr = await f(`/api/evenements/${ev.id}/participation`, { method: 'POST', cookie: cAgent });
+    const inscrJ = await inscr.json().catch(() => null);
+    inscr.status === 200 && inscrJ?.nb_participants === 1 && inscrJ.je_participe === true
+      ? ok('événements: inscription → compteur=1 + je_participe') : ko(`événements: inscription (status ${inscr.status}, nb ${inscrJ?.nb_participants})`);
+    const desinscr = await f(`/api/evenements/${ev.id}/participation`, { method: 'DELETE', cookie: cAgent });
+    const desinscrJ = await desinscr.json().catch(() => null);
+    desinscr.status === 200 && desinscrJ?.nb_participants === 0
+      ? ok('événements: désinscription → compteur=0') : ko(`événements: désinscription (nb ${desinscrJ?.nb_participants})`);
+    const inscrB = await f(`/api/evenements/${ev.id}/participation`, { method: 'POST', cookie: cAutre });
+    const inscrBJ = await inscrB.json().catch(() => null);
+    inscrBJ?.nb_participants === 1 && inscrBJ.participants?.some((p) => p.user_id === autre.id)
+      ? ok('événements: liste des participants (noms) visible') : ko('événements: liste participants');
+    const evEditAutre = await f(`/api/evenements/${ev.id}`, { method: 'PUT', cookie: cAutre, body: { titre: 'pirate' } });
+    evEditAutre.status === 403 ? ok('événements: édition par un non-créateur non-admin refusée (403)') : ko(`événements: protection édition (status ${evEditAutre.status})`);
+    const evDelAdmin = await f(`/api/evenements/${ev.id}`, { method: 'DELETE' });
+    evDelAdmin.status === 204 ? ok('événements: admin supprime n\'importe lequel (204, cascade participants)') : ko(`événements: suppression admin (status ${evDelAdmin.status})`);
+
     // g) Durcissement : throttle anti-brute-force sur le login (en dernier — neutralise l'IP après coup)
     let throttle429 = false;
     for (let i = 0; i < 12; i++) {

@@ -69,6 +69,17 @@ async function seed() {
   const annonce = await post('/api/publications', { titre: 'Bienvenue sur le nouveau portail', corps: 'Le portail Amitel s\'enrichit : onboarding, tickets, comptes et désormais ce mur de publications. Bonne navigation !' });
   await patch(`/api/publications/${annonce.id}/epingle`, { epingle: true });
   await post('/api/publications', { titre: 'Maintenance vendredi 18h', corps: 'Une courte interruption de service est prévue vendredi en fin de journée.' });
+  // Événements : un événement + 2 inscrits (via leurs comptes) pour montrer le compteur + les noms.
+  const evt = await post('/api/evenements', { titre: 'Afterwork de juin', lieu: 'Terrasse du 3e', date_event: '2099-06-27 18:30', description: 'Boissons et tapas offerts — venez nombreux !' });
+  const cookieDe = async (email) => {
+    const r = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'motdepasse' }) });
+    const m = (r.headers.get('set-cookie') || '').match(/sid=([^;]+)/);
+    return m ? `sid=${m[1]}` : '';
+  };
+  for (const email of ['paul@amitel.fr', 'marie@amitel.fr']) {
+    const ck = await cookieDe(email);
+    await fetch(`${BASE}/api/evenements/${evt.id}/participation`, { method: 'POST', headers: { Cookie: ck } });
+  }
   return proj.id;
 }
 
@@ -166,12 +177,13 @@ try {
   // 3) Vues connectées (navigation par hash, sans reload)
   const okBoard = await capturerHash(`#/ticketing/p/${projId}`, 'board', '.tk-board');
   const okAdmin = await capturerHash('#/admin/', 'admin', '.tk-tbl');
+  const okEvt = await capturerHash('#/evenements/', 'evenements', '.evt-liste');
   const okOnb = await capturerHash('#/onboarding/', 'onboarding', '.grille, .vide');
   const okAccueil = await capturerHash('#/', 'accueil', '.pub', true);
 
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okOnb && okAccueil && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);

@@ -1532,3 +1532,80 @@ a {
   font-size: 0.78rem;
   color: var(--gris-3);
 }
+
+/* ============================== ÉVÉNEMENTS =============================== */
+.evt-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.evt {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 16px 18px;
+  box-shadow: var(--ombre);
+  display: flex;
+  flex-direction: column;
+}
+.evt.is-passe {
+  opacity: 0.62;
+}
+.evt__tete {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.evt__titre {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.evt__actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.evt__infos {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--gris-2);
+}
+.evt__desc {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--gris-2);
+  font-size: 0.92rem;
+}
+.evt__pied {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.evt__compteur {
+  font-size: 0.85rem;
+  color: var(--gris-2);
+}
+.evt__compteur strong {
+  color: var(--rouge);
+  font-size: 1rem;
+}
+.evt__participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.evt__vide {
+  font-size: 0.82rem;
+  color: var(--gris-3);
+  font-style: italic;
+}
+.evt__meta {
+  margin-top: 10px;
+  font-size: 0.76rem;
+  color: var(--gris-3);
+}
