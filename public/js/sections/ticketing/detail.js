@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { store, PRIO_LABEL } from './store.js';
 import { ouvrirModale, fermerModale } from '../../core/modal.js';
 import { echappe, toast, formatHorodatage } from '../../core/ui.js';
+import { moiCourant, estAdmin, badgeOperateur } from '../../core/identite.js';
 
 // Échéances : stockées en UTC ('YYYY-MM-DD HH:MM:SS') <-> input datetime-local (heure LOCALE du navigateur).
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -43,6 +44,14 @@ function dessiner(app, t, projet) {
     store.personnes.filter((p) => p.actif).map((p) => ({ v: String(p.id), l: p.nom })),
   );
 
+  // Édition des champs + réassignation : réservée au créateur du ticket (ou admin) — aligné sur la garde serveur.
+  const moi = moiCourant();
+  const estCreateur =
+    (Number.isInteger(t.created_par_id) && moi && t.created_par_id === moi.id) ||
+    (t.created_par_id == null && !!t.created_par && t.created_par === badgeOperateur());
+  const peutEditer = estCreateur || estAdmin();
+  const propRO = (label, valeur) => `<div class="tk-prop tk-prop--info"><span>${label}</span><strong>${echappe(valeur || '—')}</strong></div>`;
+
   const commentaires = t.commentaires
     .map((c) => `<div class="tk-com"><div class="tk-com__tete"><strong>${echappe(c.auteur || '—')}</strong><span>${formatHorodatage(c.created_at)}</span></div><p>${echappe(c.corps)}</p></div>`)
     .join('') || '<p class="tk-col__vide">Aucun commentaire.</p>';
@@ -58,7 +67,7 @@ function dessiner(app, t, projet) {
         <p class="tdb__sous"><a href="#/ticketing/p/${t.project_id}">← ${echappe(t.projet_nom)}</a> ${t.en_retard ? '· <span class="puce puce--retard">⏰ en retard</span>' : ''}</p>
       </div>
       <div class="tk-actions">
-        <button class="bouton bouton--fantome" id="btn-editer">✎ Éditer</button>
+        ${peutEditer ? '<button class="bouton bouton--fantome" id="btn-editer">✎ Éditer</button>' : ''}
         <button class="bouton bouton--danger" id="btn-supprimer">Supprimer</button>
       </div>
     </div>
@@ -77,10 +86,18 @@ function dessiner(app, t, projet) {
       </section>
       <aside class="tk-detail__cote">
         <label class="tk-prop"><span>Statut</span><select id="f-statut">${selOptions(statuts, t.statut)}</select></label>
-        <label class="tk-prop"><span>Priorité</span><select id="f-prio">${selOptions(m.priorites.map((p) => ({ v: p, l: PRIO_LABEL[p] || p })), t.priorite)}</select></label>
-        <label class="tk-prop"><span>Type</span><select id="f-type">${selOptions(m.types.map((x) => ({ v: x, l: x })), t.type)}</select></label>
-        <label class="tk-prop"><span>Assigné</span><select id="f-assignee">${selOptions(personnes, t.assignee ? String(t.assignee.id) : '')}</select></label>
-        <label class="tk-prop"><span>Échéance</span><input id="f-echeance" type="datetime-local" value="${echappe(utcVersInputLocal(t.echeance))}" /></label>
+        ${peutEditer
+          ? `<label class="tk-prop"><span>Priorité</span><select id="f-prio">${selOptions(m.priorites.map((p) => ({ v: p, l: PRIO_LABEL[p] || p })), t.priorite)}</select></label>`
+          : propRO('Priorité', PRIO_LABEL[t.priorite] || t.priorite)}
+        ${peutEditer
+          ? `<label class="tk-prop"><span>Type</span><select id="f-type">${selOptions(m.types.map((x) => ({ v: x, l: x })), t.type)}</select></label>`
+          : propRO('Type', t.type)}
+        ${peutEditer
+          ? `<label class="tk-prop"><span>Assigné</span><select id="f-assignee">${selOptions(personnes, t.assignee ? String(t.assignee.id) : '')}</select></label>`
+          : propRO('Assigné', t.assignee ? t.assignee.nom : 'Non assigné')}
+        ${peutEditer
+          ? `<label class="tk-prop"><span>Échéance</span><input id="f-echeance" type="datetime-local" value="${echappe(utcVersInputLocal(t.echeance))}" /></label>`
+          : propRO('Échéance', t.echeance ? formatHorodatage(t.echeance) : '—')}
         <div class="tk-prop tk-prop--info"><span>Demandeur</span><strong>${echappe(t.demandeur || '—')}</strong></div>
         <div class="tk-prop tk-prop--info"><span>Créé</span><strong>${formatHorodatage(t.created_at)}</strong></div>
       </aside>
@@ -97,10 +114,10 @@ function dessiner(app, t, projet) {
     }
   };
   app.querySelector('#f-statut').addEventListener('change', (e) => patch({ statut: e.target.value }));
-  app.querySelector('#f-prio').addEventListener('change', (e) => patch({ priorite: e.target.value }));
-  app.querySelector('#f-type').addEventListener('change', (e) => patch({ type: e.target.value }));
-  app.querySelector('#f-assignee').addEventListener('change', (e) => patch({ assignee_id: e.target.value ? Number(e.target.value) : null }));
-  app.querySelector('#f-echeance').addEventListener('change', (e) => patch({ echeance: inputLocalVersUtc(e.target.value) }));
+  app.querySelector('#f-prio')?.addEventListener('change', (e) => patch({ priorite: e.target.value }));
+  app.querySelector('#f-type')?.addEventListener('change', (e) => patch({ type: e.target.value }));
+  app.querySelector('#f-assignee')?.addEventListener('change', (e) => patch({ assignee_id: e.target.value ? Number(e.target.value) : null }));
+  app.querySelector('#f-echeance')?.addEventListener('change', (e) => patch({ echeance: inputLocalVersUtc(e.target.value) }));
 
   const form = app.querySelector('#form-com');
   form.addEventListener('submit', async (e) => {
@@ -131,7 +148,7 @@ function dessiner(app, t, projet) {
     });
   });
 
-  app.querySelector('#btn-editer').addEventListener('click', () => {
+  app.querySelector('#btn-editer')?.addEventListener('click', () => {
     ouvrirModale({
       titre: `Éditer ${t.cle}`,
       corpsHTML: `<form id="form-edit"><div class="champs" style="padding-top:0">

@@ -200,15 +200,25 @@ try {
   await envoyer('Runtime.evaluate', { expression: `document.body.click()`, returnByValue: true }, session);
   await wait(150);
 
+  // Détail d'un ticket vu par son CRÉATEUR (admin) : contrôles d'édition présents.
+  const okDetail = await capturerHash('#/ticketing/t/1', 'ticket', '.tk-detail');
+
   // DARK MODE : on active le thème sombre et on recapture 2 vues.
   await envoyer('Runtime.evaluate', { expression: `document.body.classList.add('sombre')`, returnByValue: true }, session);
   await wait(200);
   const okBoardDark = await capturerHash(`#/ticketing/p/${projId}`, 'board-dark', '.tk-board');
   const okAccueilDark = await capturerHash('#/', 'accueil-dark', '.pub', true);
 
+  // Détail d'un ticket vu par un NON-créateur (Paul : assigné mais pas l'auteur) → édition masquée.
+  await envoyer('Runtime.evaluate', { expression: `document.getElementById('op-deconnexion')?.click()`, returnByValue: true }, session);
+  for (let i = 0; i < 40; i++) { const r = await envoyer('Runtime.evaluate', { expression: `!!document.getElementById('login-form')`, returnByValue: true }, session); if (r.result?.value) break; await wait(150); }
+  await envoyer('Runtime.evaluate', { expression: `(()=>{const e=document.getElementById('login-email'),p=document.getElementById('login-mdp');if(!e||!p)return;e.value='paul@amitel.fr';p.value='motdepasse';document.getElementById('login-form').requestSubmit();})()`, returnByValue: true }, session);
+  for (let i = 0; i < 40; i++) { const r = await envoyer('Runtime.evaluate', { expression: `!!document.querySelector('.op-badge')`, returnByValue: true }, session); if (r.result?.value) break; await wait(150); }
+  const okDetailPaul = await capturerHash('#/ticketing/t/1', 'ticket-noncreateur', '.tk-detail');
+
   console.log(`\n  erreurs console: ${erreurs.length}`);
   erreurs.forEach((e) => console.log('   ❌ ' + e));
-  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okCloche && okBoardDark && okAccueilDark && erreurs.length === 0;
+  const ok = okLogin && okBoard && okAdmin && okEvt && okOnb && okAccueil && okCloche && okDetail && okBoardDark && okAccueilDark && okDetailPaul && erreurs.length === 0;
   console.log(ok ? '\n✅ UI RENDU OK' : '\n❌ UI : rendu incomplet ou erreurs console');
   nettoyer();
   process.exit(ok ? 0 : 1);
