@@ -32,12 +32,12 @@ export async function renduAccueil(app, sections) {
     `<div class="grille-sections">${cartes}</div>` +
     `<section class="fil-pub" aria-label="Publications">
        <h2 class="fil-pub__titre">📣 Publications</h2>
+       <div id="pub-liste" class="pub-liste"><p class="tk-col__vide">Chargement…</p></div>
        <form id="pub-form" class="pub-form">
          <input id="pub-titre" maxlength="150" autocomplete="off" placeholder="Titre de la publication" />
          <textarea id="pub-corps" rows="2" placeholder="Partagez une annonce, une info…"></textarea>
          <button class="bouton" type="submit">Publier</button>
        </form>
-       <div id="pub-liste" class="pub-liste"><p class="tk-col__vide">Chargement…</p></div>
      </section>`;
 
   const form = app.querySelector('#pub-form');
@@ -103,14 +103,23 @@ function cartePub(p, moi, admin) {
     admin ? `<button class="tk-lien" data-epingle="${p.id}" data-etat="${p.epingle ? 1 : 0}">${p.epingle ? 'désépingler' : 'épingler'}</button>` : '',
     peut ? `<button class="tk-lien tk-lien--danger" data-suppr="${p.id}">supprimer</button>` : '',
   ].filter(Boolean).join(' ');
+  const auteur = p.auteur_nom || '—';
+  const initiale = (auteur.trim()[0] || '—').toUpperCase();
   return `
     <article class="pub ${p.epingle ? 'is-epingle' : ''}">
+      ${p.epingle ? '<span class="pub__ruban">📌 Épinglé</span>' : ''}
       <div class="pub__tete">
-        <h3 class="pub__titre">${p.epingle ? '📌 ' : ''}${echappe(p.titre)}</h3>
+        <h3 class="pub__titre">${echappe(p.titre)}</h3>
         <div class="pub__actions">${actions}</div>
       </div>
       ${p.corps ? `<p class="pub__corps">${echappe(p.corps)}</p>` : ''}
-      <div class="pub__meta">${echappe(p.auteur_nom || '—')} · ${formatHorodatage(p.created_at)}</div>
+      <div class="pub__pied">
+        <span class="pub__avatar" aria-hidden="true">${echappe(initiale)}</span>
+        <span class="pub__qui">
+          <span class="pub__auteur">${echappe(auteur)}</span>
+          <span class="pub__date">${formatHorodatage(p.created_at)}</span>
+        </span>
+      </div>
     </article>`;
 }
 

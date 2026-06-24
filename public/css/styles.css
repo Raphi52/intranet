@@ -1532,7 +1532,7 @@ a {
   border: 1px solid var(--bordure);
   border-radius: var(--rayon);
   padding: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 0;
   box-shadow: var(--ombre);
 }
 .pub-form input,
@@ -1553,43 +1553,142 @@ a {
 .pub-liste {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  margin-bottom: 22px;
 }
 .pub {
+  position: relative;
+  overflow: hidden;
   background: var(--carte);
   border: 1px solid var(--bordure);
-  border-radius: var(--rayon-sm);
-  padding: 14px 16px;
+  border-radius: var(--rayon);
+  padding: 24px 26px;
   box-shadow: var(--ombre);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+/* Liseré « shiny » dégradé en haut de chaque card. */
+.pub::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--rouge), #e0584b);
+}
+/* Reflet lumineux discret (coin haut-droit), translucide → neutre vis-à-vis du thème. */
+.pub::after {
+  content: '';
+  position: absolute;
+  top: -45%;
+  right: -8%;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(192, 57, 43, 0.1), transparent 70%);
+  pointer-events: none;
+}
+.pub:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ombre-forte);
+  border-color: rgba(192, 57, 43, 0.35);
 }
 .pub.is-epingle {
   border-color: var(--ambre);
   background: #fffdf6;
+  box-shadow: 0 10px 40px rgba(243, 156, 18, 0.18);
+}
+.pub.is-epingle::before {
+  height: 5px;
+  background: linear-gradient(90deg, var(--ambre), #f7c873);
+}
+.pub.is-epingle::after {
+  background: radial-gradient(circle, rgba(243, 156, 18, 0.16), transparent 70%);
+}
+/* Ruban « Épinglé » (mise en valeur). */
+.pub__ruban {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ambre), #f7c873);
+  color: #5a3d06;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  position: relative;
+  z-index: 1;
+}
+/* Le contenu passe au-dessus du reflet. */
+.pub__tete,
+.pub__corps,
+.pub__pied {
+  position: relative;
+  z-index: 1;
 }
 .pub__tete {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 14px;
 }
 .pub__titre {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 .pub__actions {
   display: flex;
   gap: 10px;
   flex-shrink: 0;
+  padding-top: 4px;
 }
 .pub__corps {
-  margin: 8px 0 0;
+  margin: 12px 0 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--gris-2);
 }
-.pub__meta {
-  margin-top: 10px;
+.pub__pied {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+.pub__avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  background: linear-gradient(135deg, var(--rouge), #e0584b);
+  box-shadow: 0 2px 10px rgba(192, 57, 43, 0.3);
+}
+.pub.is-epingle .pub__avatar {
+  background: linear-gradient(135deg, var(--ambre), #f7c873);
+  box-shadow: 0 2px 10px rgba(243, 156, 18, 0.3);
+}
+.pub__qui {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.pub__auteur {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+.pub__date {
   font-size: 0.78rem;
   color: var(--gris-3);
 }

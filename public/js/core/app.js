@@ -101,8 +101,8 @@ function afficherBadge() {
       <span class="op-badge__nom">${echappe(badge)}</span>
     </span>
     <div class="cote__bas">
-      <button class="bouton bouton--fantome bouton--sm" id="op-deconnexion">Déconnexion</button>
       <button class="cote__theme" id="theme-toggle" aria-label="Thème clair / sombre" title="Thème clair / sombre">${sombre ? '☀️' : '🌙'}</button>
+      <button class="bouton bouton--fantome bouton--sm" id="op-deconnexion">Déconnexion</button>
     </div>`;
   zone.querySelector('#op-deconnexion').addEventListener('click', async () => {
     await deconnexion();
